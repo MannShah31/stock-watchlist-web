@@ -22,14 +22,14 @@
 
     body {
       margin: 0;
-      font-family: Inter, system-ui, -apple-system, BlinkMacSystemFont, Arial, sans-serif;
+      font-family: Inter, system-ui, Arial, sans-serif;
       background: var(--bg);
       color: var(--text);
       padding: 32px;
     }
 
     .container {
-      max-width: 900px;
+      max-width: 1200px;
       margin: auto;
     }
 
@@ -44,17 +44,12 @@
       position: relative;
     }
 
-    input[type="text"], input[type="number"] {
+    input {
       width: 100%;
       padding: 14px;
       font-size: 16px;
       border-radius: 10px;
       border: 1px solid var(--border);
-      outline: none;
-    }
-
-    input:focus {
-      border-color: var(--accent);
     }
 
     .dropdown {
@@ -84,25 +79,27 @@
       box-shadow: 0 20px 40px rgba(0,0,0,0.08);
       padding: 20px;
       margin-top: 30px;
+      overflow-x: auto;
     }
 
     table {
       width: 100%;
       border-collapse: collapse;
+      font-size: 14px;
     }
 
     th {
       text-align: left;
-      font-size: 14px;
       color: var(--muted);
-      padding-bottom: 10px;
       border-bottom: 1px solid var(--border);
+      padding: 10px;
+      white-space: nowrap;
     }
 
     td {
-      padding: 14px 6px;
+      padding: 12px 10px;
       border-bottom: 1px solid var(--border);
-      vertical-align: middle;
+      white-space: nowrap;
     }
 
     .green { color: var(--green); font-weight: 600; }
@@ -124,9 +121,9 @@
     .remove-btn {
       background: none;
       border: none;
-      color: #9ca3af;
       cursor: pointer;
       font-size: 18px;
+      color: #9ca3af;
     }
 
     .remove-btn:hover {
@@ -140,18 +137,20 @@
   <h1>📈 Stock Watchlist</h1>
 
   <div class="search-box">
-    <input id="search" type="text" placeholder="Search stock (Reliance, TCS, INFY…)" />
+    <input id="search" placeholder="Search stock (Reliance, TCS, INFY…)" />
     <div id="dropdown" class="dropdown"></div>
   </div>
 
   <div class="card">
-    <h3>Your Watchlist</h3>
     <table>
       <thead>
         <tr>
           <th>Stock</th>
-          <th>Price</th>
-          <th>Change</th>
+          <th>Price (₹)</th>
+          <th>% Change</th>
+          <th>52W High</th>
+          <th>52W Low</th>
+          <th>Volume</th>
           <th>Alert</th>
           <th></th>
         </tr>
@@ -162,7 +161,6 @@
 </div>
 
 <script>
-  // EmailJS init
   emailjs.init("-nPbEj5p827UiuqEA");
 
   let allStocks = [];
@@ -225,11 +223,9 @@
         a.triggered = true;
         localStorage.setItem("alerts", JSON.stringify(alerts));
 
-        if (Notification.permission === "granted") {
-          new Notification("Stock Alert 🚨", {
-            body: `${a.symbol} crossed ₹${a.price}`
-          });
-        }
+        new Notification("Stock Alert 🚨", {
+          body: `${a.symbol} crossed ₹${a.price}`
+        });
 
         emailjs.send("service_38gmuds", "template_sem5vlb", {
           symbol: a.symbol,
@@ -258,19 +254,22 @@
       const d = prices[stock.symbol];
       if (!d) return;
 
-      const activeAlert = alerts.find(a => a.symbol === stock.symbol && !a.triggered);
+      const alertObj = alerts.find(a => a.symbol === stock.symbol && !a.triggered);
 
       const tr = document.createElement("tr");
       tr.innerHTML = `
         <td>${stock.name}</td>
-        <td>₹ ${d.price.toFixed(2)}</td>
+        <td>${d.price.toFixed(2)}</td>
         <td class="${d.change >= 0 ? "green" : "red"}">
-          ${d.change.toFixed(2)} (${d.changePercent.toFixed(2)}%)
+          ${d.changePercent.toFixed(2)}%
         </td>
+        <td>${d.high52}</td>
+        <td>${d.low52}</td>
+        <td>${d.volume.toLocaleString()}</td>
         <td>
-          <input class="alert-input" type="number" placeholder="₹ Alert"
+          <input class="alert-input" type="number" placeholder="₹"
             onkeydown="if(event.key==='Enter') setAlert('${stock.symbol}', this.value)">
-          ${activeAlert ? `<div class="alert-set">Alert @ ₹${activeAlert.price}</div>` : ""}
+          ${alertObj ? `<div class="alert-set">@ ₹${alertObj.price}</div>` : ""}
         </td>
         <td><button class="remove-btn" onclick="removeStock('${stock.symbol}')">✕</button></td>
       `;
