@@ -1,0 +1,75 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>Stock Watchlist</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      background: #f5f7fa;
+      padding: 40px;
+    }
+    .card {
+      background: white;
+      max-width: 420px;
+      padding: 20px;
+      border-radius: 10px;
+      box-shadow: 0 10px 25px rgba(0,0,0,0.1);
+    }
+    .price {
+      font-size: 32px;
+      font-weight: bold;
+    }
+    .green { color: #0a9d58; }
+    .red { color: #d63031; }
+    .label {
+      color: #666;
+      font-size: 14px;
+    }
+  </style>
+</head>
+<body>
+
+  <h1>📈 Stock Watchlist</h1>
+
+  <div class="card">
+    <h2 id="name">Loading...</h2>
+    <div class="price" id="price">—</div>
+    <div id="change"></div>
+
+    <p class="label">Volume: <span id="volume">—</span></p>
+    <p class="label">52W High: <span id="high52">—</span></p>
+    <p class="label">52W Low: <span id="low52">—</span></p>
+  </div>
+
+  <script>
+    async function loadStock() {
+      try {
+        const res = await fetch("/api/stock");
+        const data = await res.json();
+
+        document.getElementById("name").innerText = data.symbol;
+        document.getElementById("price").innerText = "₹ " + data.price;
+
+        const changeEl = document.getElementById("change");
+        const isUp = data.change >= 0;
+        changeEl.innerText =
+          (isUp ? "+" : "") + data.change.toFixed(2) +
+          " (" + data.changePercent.toFixed(2) + "%)";
+        changeEl.className = isUp ? "green" : "red";
+
+        document.getElementById("volume").innerText = data.volume.toLocaleString();
+        document.getElementById("high52").innerText = data.high52;
+        document.getElementById("low52").innerText = data.low52;
+      } catch (err) {
+        document.getElementById("name").innerText = "Failed to load data";
+      }
+    }
+
+    loadStock();
+  </script>
+
+</body>
+</html>

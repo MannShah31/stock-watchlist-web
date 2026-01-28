@@ -2,6 +2,7 @@ const express = require("express");
 const https = require("https");
 
 const app = express();
+app.use(express.static("public"));
 
 const PORT = process.env.PORT || 3000;
 const HOST = "0.0.0.0";
