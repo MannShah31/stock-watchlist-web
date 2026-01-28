@@ -140,7 +140,10 @@
     renderDropdown(filtered);
   });
 
-  loadStocks().then(renderWatchlist);
+loadStocks().then(() => {
+  renderWatchlist();
+  setInterval(renderWatchlist, 15000); // refresh every 15 sec
+});
 </script>
 
 </body>
