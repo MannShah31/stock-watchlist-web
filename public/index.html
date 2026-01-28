@@ -6,63 +6,141 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
 
   <style>
-    body {
-      font-family: Arial, sans-serif;
-      background: #f5f7fa;
-      padding: 40px;
+    :root {
+      --bg: #f4f6fb;
+      --card: #ffffff;
+      --text: #1f2937;
+      --muted: #SHOWING000000; /* fallback if browser glitches */
+      --green: #16a34a;
+      --red: #dc2626;
+      --accent: #2563eb;
+      --border: #e5e7eb;
     }
+
+    body {
+      margin: 0;
+      font-family: Inter, system-ui, -apple-system, BlinkMacSystemFont, Arial, sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      padding: 32px;
+    }
+
     .container {
-      max-width: 600px;
+      max-width: 900px;
       margin: auto;
     }
-    .card {
-      background: white;
-      padding: 20px;
-      border-radius: 10px;
-      box-shadow: 0 10px 25px rgba(0,0,0,0.1);
-      margin-top: 20px;
+
+    h1 {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      margin-bottom: 20px;
     }
-    input {
+
+    .search-box {
+      position: relative;
+    }
+
+    input[type="text"] {
       width: 100%;
-      padding: 10px;
+      padding: 14px;
       font-size: 16px;
+      border-radius: 10px;
+      border: 1px solid var(--border);
+      outline: none;
     }
+
+    input[type="text"]:focus {
+      border-color: var(--accent);
+    }
+
     .dropdown {
-      border: 1px solid #ddd;
-      max-height: 200px;
+      position: absolute;
+      width: 100%;
+      background: white;
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      margin-top: 4px;
+      max-height: 240px;
       overflow-y: auto;
+      z-index: 10;
     }
+
     .option {
-      padding: 10px;
+      padding: 12px;
       cursor: pointer;
     }
+
     .option:hover {
-      background: #eee;
+      background: #f1f5f9;
     }
+
+    .card {
+      background: var(--card);
+      border-radius: 14px;
+      box-shadow: 0 20px 40px rgba(0,0,0,0.08);
+      padding: 20px;
+      margin-top: 30px;
+    }
+
     table {
       width: 100%;
-      margin-top: 20px;
       border-collapse: collapse;
     }
-    th, td {
-      padding: 10px;
-      border-bottom: 1px solid #ddd;
+
+    th {
       text-align: left;
+      font-size: 14px;
+      color: #6b7280;
+      padding-bottom: 10px;
+      border-bottom: 1px solid var(--border);
     }
-    .green { color: #0a9d58; }
-    .red { color: #d63031; }
+
+    td {
+      padding: 14px 6px;
+      border-bottom: 1px solid var(--border);
+      vertical-align: middle;
+    }
+
+    .green { color: var(--green); font-weight: 600; }
+    .red { color: var(--red); font-weight: 600; }
+
+    .alert-input {
+      width: 90px;
+      padding: 6px;
+      border-radius: 6px;
+      border: 1px solid var(--border);
+    }
+
+    .alert-set {
+      font-size: 12px;
+      color: var(--accent);
+      margin-top: 4px;
+    }
+
+    .remove-btn {
+      background: none;
+      border: none;
+      color: #9ca3af;
+      cursor: pointer;
+      font-size: 18px;
+    }
+
+    .remove-btn:hover {
+      color: var(--red);
+    }
   </style>
 </head>
-<body>
 
+<body>
 <div class="container">
   <h1>📈 Stock Watchlist</h1>
 
-  <!-- Search box -->
-  <input id="search" placeholder="Search stock (e.g. Reliance, TCS)" />
-
-  <!-- Dropdown -->
-  <div id="dropdown" class="dropdown"></div>
+  <!-- Search -->
+  <div class="search-box">
+    <input id="search" type="text" placeholder="Search stock (Reliance, TCS, INFY…)" />
+    <div id="dropdown" class="dropdown"></div>
+  </div>
 
   <!-- Watchlist -->
   <div class="card">
@@ -74,6 +152,7 @@
           <th>Price</th>
           <th>Change</th>
           <th>Alert</th>
+          <th></th>
         </tr>
       </thead>
       <tbody id="watchlist"></tbody>
@@ -84,6 +163,11 @@
 <script>
   let allStocks = [];
   let watchlist = JSON.parse(localStorage.getItem("watchlist") || "[]");
+  let alerts = JSON.parse(localStorage.getItem("alerts") || "[]");
+
+  if ("Notification" in window && Notification.permission !== "granted") {
+    Notification.requestPermission();
+  }
 
   async function loadStocks() {
     const res = await fetch("/api/stocks");
@@ -112,40 +196,94 @@
     renderWatchlist();
   }
 
+  function removeStock(symbol) {
+    watchlist = watchlist.filter(s => s.symbol !== symbol);
+    alerts = alerts.filter(a => a.symbol !== symbol);
+    localStorage.setItem("watchlist", JSON.stringify(watchlist));
+    localStorage.setItem("alerts", JSON.stringify(alerts));
+    renderWatchlist();
+  }
+
+  function setAlert(symbol, price) {
+    price = Number(price);
+    if (!price) return;
+
+    alerts.push({ symbol, price, triggered: false });
+    localStorage.setItem("alerts", JSON.stringify(alerts));
+    alert(`Alert set for ${symbol} at ₹${price}`);
+  }
+
+  function checkAlerts(prices) {
+    alerts.forEach(a => {
+      if (a.triggered) return;
+      const d = prices[a.symbol];
+      if (!d) return;
+
+      if (d.price >= a.price) {
+        a.triggered = true;
+        localStorage.setItem("alerts", JSON.stringify(alerts));
+
+        if (Notification.permission === "granted") {
+          new Notification("Stock Alert 🚨", {
+            body: `${a.symbol} crossed ₹${a.price}`
+          });
+        }
+      }
+    });
+  }
+
   async function renderWatchlist() {
+    if (!watchlist.length) return;
+
+    const symbols = watchlist.map(s => s.symbol).join(",");
+    const res = await fetch(`/api/prices?symbols=${symbols}`);
+    const prices = await res.json();
+
+    checkAlerts(prices);
+
     const tbody = document.getElementById("watchlist");
     tbody.innerHTML = "";
 
-    for (const stock of watchlist) {
-      const res = await fetch(`/api/stock?symbol=${stock.symbol}`);
-      const data = await res.json();
+    watchlist.forEach(stock => {
+      const data = prices[stock.symbol];
+      if (!data) return;
+
+      const alertObj = alerts.find(a => a.symbol === stock.symbol && !a.triggered);
 
       const tr = document.createElement("tr");
       tr.innerHTML = `
         <td>${stock.name}</td>
-        <td>₹ ${data.price}</td>
+        <td>₹ ${data.price.toFixed(2)}</td>
         <td class="${data.change >= 0 ? "green" : "red"}">
           ${data.change.toFixed(2)} (${data.changePercent.toFixed(2)}%)
         </td>
+        <td>
+          <input class="alert-input" type="number" placeholder="₹ Alert"
+            onkeydown="if(event.key==='Enter') setAlert('${stock.symbol}', this.value)" />
+          ${alertObj ? `<div class="alert-set">Alert @ ₹${alertObj.price}</div>` : ""}
+        </td>
+        <td>
+          <button class="remove-btn" onclick="removeStock('${stock.symbol}')">✕</button>
+        </td>
       `;
       tbody.appendChild(tr);
-    }
+    });
   }
 
   document.getElementById("search").addEventListener("input", e => {
     const q = e.target.value.toLowerCase();
     if (!q) return document.getElementById("dropdown").innerHTML = "";
-    const filtered = allStocks.filter(
-      s => s.name.toLowerCase().includes(q) || s.symbol.toLowerCase().includes(q)
+    renderDropdown(
+      allStocks.filter(
+        s => s.name.toLowerCase().includes(q) || s.symbol.toLowerCase().includes(q)
+      )
     );
-    renderDropdown(filtered);
   });
 
-loadStocks().then(() => {
-  renderWatchlist();
-  setInterval(renderWatchlist, 15000); // refresh every 15 sec
-});
+  loadStocks().then(() => {
+    renderWatchlist();
+    setInterval(renderWatchlist, 15000);
+  });
 </script>
-
 </body>
 </html>
