@@ -9,11 +9,6 @@ app.use(express.static("public"));
 const PORT = process.env.PORT || 3000;
 const HOST = "0.0.0.0";
 
-// Home
-app.get("/", (req, res) => {
-  res.send("Stock Watchlist Web App is running");
-});
-
 // Health
 app.get("/api/health", (req, res) => {
   res.json({ status: "ok" });
