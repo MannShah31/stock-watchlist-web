@@ -1,5 +1,6 @@
 const express = require("express");
 const https = require("https");
+const fs = require("fs");
 
 const app = express();
 app.use(express.static("public"));
@@ -17,7 +18,7 @@ app.get("/api/health", (req, res) => {
   res.json({ status: "ok" });
 });
 
-// ✅ RELIABLE YAHOO ENDPOINT (chart API)
+// 🔥 SINGLE STOCK (RELIANCE) — WORKING SOURCE
 app.get("/api/stock", (req, res) => {
   const url =
     "https://query1.finance.yahoo.com/v8/finance/chart/RELIANCE.NS?interval=1m&range=1d";
@@ -41,13 +42,6 @@ app.get("/api/stock", (req, res) => {
         try {
           const json = JSON.parse(raw);
 
-          // 🔍 LOG WHAT YAHOO ACTUALLY SENT (first 300 chars)
-          console.log(
-            "Yahoo raw response:",
-            JSON.stringify(json).slice(0, 300)
-          );
-
-          // ❌ Yahoo explicitly returned an error
           if (json.chart?.error) {
             return res.status(503).json({
               error: "Yahoo blocked the request",
@@ -55,7 +49,6 @@ app.get("/api/stock", (req, res) => {
             });
           }
 
-          // ❌ No data
           if (!json.chart?.result || !json.chart.result.length) {
             return res.status(503).json({
               error: "No stock data returned from Yahoo"
@@ -81,9 +74,7 @@ app.get("/api/stock", (req, res) => {
           });
         } catch (err) {
           console.error("Yahoo parse failed. Raw:", raw.slice(0, 300));
-          res.status(500).json({
-            error: "Yahoo response not usable"
-          });
+          res.status(500).json({ error: "Yahoo response not usable" });
         }
       });
     }
@@ -91,6 +82,17 @@ app.get("/api/stock", (req, res) => {
     console.error("Yahoo request failed:", err.message);
     res.status(500).json({ error: "Yahoo request failed" });
   });
+});
+
+// 🔽 STOCK MASTER LIST (FOR DROPDOWN)
+app.get("/api/stocks", (req, res) => {
+  try {
+    const data = fs.readFileSync("stocks.json", "utf-8");
+    const stocks = JSON.parse(data);
+    res.json(stocks);
+  } catch (err) {
+    res.status(500).json({ error: "Failed to load stock list" });
+  }
 });
 
 // Start server
