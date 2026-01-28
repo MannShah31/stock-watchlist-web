@@ -5,12 +5,15 @@
   <title>Stock Watchlist</title>
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
 
+  <!-- EmailJS -->
+  <script src="https://cdn.jsdelivr.net/npm/emailjs-com@3/dist/email.min.js"></script>
+
   <style>
     :root {
       --bg: #f4f6fb;
       --card: #ffffff;
       --text: #1f2937;
-      --muted: #SHOWING000000; /* fallback if browser glitches */
+      --muted: #6b7280;
       --green: #16a34a;
       --red: #dc2626;
       --accent: #2563eb;
@@ -41,7 +44,7 @@
       position: relative;
     }
 
-    input[type="text"] {
+    input[type="text"], input[type="number"] {
       width: 100%;
       padding: 14px;
       font-size: 16px;
@@ -50,7 +53,7 @@
       outline: none;
     }
 
-    input[type="text"]:focus {
+    input:focus {
       border-color: var(--accent);
     }
 
@@ -91,7 +94,7 @@
     th {
       text-align: left;
       font-size: 14px;
-      color: #6b7280;
+      color: var(--muted);
       padding-bottom: 10px;
       border-bottom: 1px solid var(--border);
     }
@@ -136,13 +139,11 @@
 <div class="container">
   <h1>📈 Stock Watchlist</h1>
 
-  <!-- Search -->
   <div class="search-box">
     <input id="search" type="text" placeholder="Search stock (Reliance, TCS, INFY…)" />
     <div id="dropdown" class="dropdown"></div>
   </div>
 
-  <!-- Watchlist -->
   <div class="card">
     <h3>Your Watchlist</h3>
     <table>
@@ -161,6 +162,9 @@
 </div>
 
 <script>
+  // EmailJS init
+  emailjs.init("-nPbEj5p827UiuqEA");
+
   let allStocks = [];
   let watchlist = JSON.parse(localStorage.getItem("watchlist") || "[]");
   let alerts = JSON.parse(localStorage.getItem("alerts") || "[]");
@@ -177,11 +181,10 @@
   function renderDropdown(filtered) {
     const dropdown = document.getElementById("dropdown");
     dropdown.innerHTML = "";
-
     filtered.slice(0, 10).forEach(stock => {
       const div = document.createElement("div");
       div.className = "option";
-      div.innerText = `${stock.name} (${stock.symbol})`;
+      div.textContent = `${stock.name} (${stock.symbol})`;
       div.onclick = () => addToWatchlist(stock);
       dropdown.appendChild(div);
     });
@@ -207,7 +210,6 @@
   function setAlert(symbol, price) {
     price = Number(price);
     if (!price) return;
-
     alerts.push({ symbol, price, triggered: false });
     localStorage.setItem("alerts", JSON.stringify(alerts));
     alert(`Alert set for ${symbol} at ₹${price}`);
@@ -228,6 +230,14 @@
             body: `${a.symbol} crossed ₹${a.price}`
           });
         }
+
+        emailjs.send("service_38gmuds", "template_sem5vlb", {
+          symbol: a.symbol,
+          alert_price: a.price,
+          current_price: d.price.toFixed(2),
+          change: d.change.toFixed(2),
+          change_percent: d.changePercent.toFixed(2)
+        });
       }
     });
   }
@@ -245,26 +255,24 @@
     tbody.innerHTML = "";
 
     watchlist.forEach(stock => {
-      const data = prices[stock.symbol];
-      if (!data) return;
+      const d = prices[stock.symbol];
+      if (!d) return;
 
-      const alertObj = alerts.find(a => a.symbol === stock.symbol && !a.triggered);
+      const activeAlert = alerts.find(a => a.symbol === stock.symbol && !a.triggered);
 
       const tr = document.createElement("tr");
       tr.innerHTML = `
         <td>${stock.name}</td>
-        <td>₹ ${data.price.toFixed(2)}</td>
-        <td class="${data.change >= 0 ? "green" : "red"}">
-          ${data.change.toFixed(2)} (${data.changePercent.toFixed(2)}%)
+        <td>₹ ${d.price.toFixed(2)}</td>
+        <td class="${d.change >= 0 ? "green" : "red"}">
+          ${d.change.toFixed(2)} (${d.changePercent.toFixed(2)}%)
         </td>
         <td>
           <input class="alert-input" type="number" placeholder="₹ Alert"
-            onkeydown="if(event.key==='Enter') setAlert('${stock.symbol}', this.value)" />
-          ${alertObj ? `<div class="alert-set">Alert @ ₹${alertObj.price}</div>` : ""}
+            onkeydown="if(event.key==='Enter') setAlert('${stock.symbol}', this.value)">
+          ${activeAlert ? `<div class="alert-set">Alert @ ₹${activeAlert.price}</div>` : ""}
         </td>
-        <td>
-          <button class="remove-btn" onclick="removeStock('${stock.symbol}')">✕</button>
-        </td>
+        <td><button class="remove-btn" onclick="removeStock('${stock.symbol}')">✕</button></td>
       `;
       tbody.appendChild(tr);
     });
@@ -273,11 +281,9 @@
   document.getElementById("search").addEventListener("input", e => {
     const q = e.target.value.toLowerCase();
     if (!q) return document.getElementById("dropdown").innerHTML = "";
-    renderDropdown(
-      allStocks.filter(
-        s => s.name.toLowerCase().includes(q) || s.symbol.toLowerCase().includes(q)
-      )
-    );
+    renderDropdown(allStocks.filter(
+      s => s.name.toLowerCase().includes(q) || s.symbol.toLowerCase().includes(q)
+    ));
   });
 
   loadStocks().then(() => {
