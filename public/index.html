@@ -11,65 +11,137 @@
       background: #f5f7fa;
       padding: 40px;
     }
+    .container {
+      max-width: 600px;
+      margin: auto;
+    }
     .card {
       background: white;
-      max-width: 420px;
       padding: 20px;
       border-radius: 10px;
       box-shadow: 0 10px 25px rgba(0,0,0,0.1);
+      margin-top: 20px;
     }
-    .price {
-      font-size: 32px;
-      font-weight: bold;
+    input {
+      width: 100%;
+      padding: 10px;
+      font-size: 16px;
+    }
+    .dropdown {
+      border: 1px solid #ddd;
+      max-height: 200px;
+      overflow-y: auto;
+    }
+    .option {
+      padding: 10px;
+      cursor: pointer;
+    }
+    .option:hover {
+      background: #eee;
+    }
+    table {
+      width: 100%;
+      margin-top: 20px;
+      border-collapse: collapse;
+    }
+    th, td {
+      padding: 10px;
+      border-bottom: 1px solid #ddd;
+      text-align: left;
     }
     .green { color: #0a9d58; }
     .red { color: #d63031; }
-    .label {
-      color: #666;
-      font-size: 14px;
-    }
   </style>
 </head>
 <body>
 
+<div class="container">
   <h1>📈 Stock Watchlist</h1>
 
+  <!-- Search box -->
+  <input id="search" placeholder="Search stock (e.g. Reliance, TCS)" />
+
+  <!-- Dropdown -->
+  <div id="dropdown" class="dropdown"></div>
+
+  <!-- Watchlist -->
   <div class="card">
-    <h2 id="name">Loading...</h2>
-    <div class="price" id="price">—</div>
-    <div id="change"></div>
-
-    <p class="label">Volume: <span id="volume">—</span></p>
-    <p class="label">52W High: <span id="high52">—</span></p>
-    <p class="label">52W Low: <span id="low52">—</span></p>
+    <h3>Your Watchlist</h3>
+    <table>
+      <thead>
+        <tr>
+          <th>Stock</th>
+          <th>Price</th>
+          <th>Change</th>
+        </tr>
+      </thead>
+      <tbody id="watchlist"></tbody>
+    </table>
   </div>
+</div>
 
-  <script>
-    async function loadStock() {
-      try {
-        const res = await fetch("/api/stock");
-        const data = await res.json();
+<script>
+  let allStocks = [];
+  let watchlist = JSON.parse(localStorage.getItem("watchlist") || "[]");
 
-        document.getElementById("name").innerText = data.symbol;
-        document.getElementById("price").innerText = "₹ " + data.price;
+  async function loadStocks() {
+    const res = await fetch("/api/stocks");
+    allStocks = await res.json();
+  }
 
-        const changeEl = document.getElementById("change");
-        const isUp = data.change >= 0;
-        changeEl.innerText =
-          (isUp ? "+" : "") + data.change.toFixed(2) +
-          " (" + data.changePercent.toFixed(2) + "%)";
-        changeEl.className = isUp ? "green" : "red";
+  function renderDropdown(filtered) {
+    const dropdown = document.getElementById("dropdown");
+    dropdown.innerHTML = "";
 
-        document.getElementById("volume").innerText = data.volume.toLocaleString();
-        document.getElementById("high52").innerText = data.high52;
-        document.getElementById("low52").innerText = data.low52;
-      } catch (err) {
-        document.getElementById("name").innerText = "Failed to load data";
-      }
+    filtered.slice(0, 10).forEach(stock => {
+      const div = document.createElement("div");
+      div.className = "option";
+      div.innerText = `${stock.name} (${stock.symbol})`;
+      div.onclick = () => addToWatchlist(stock);
+      dropdown.appendChild(div);
+    });
+  }
+
+  function addToWatchlist(stock) {
+    if (watchlist.find(s => s.symbol === stock.symbol)) return;
+    watchlist.push(stock);
+    localStorage.setItem("watchlist", JSON.stringify(watchlist));
+    document.getElementById("search").value = "";
+    document.getElementById("dropdown").innerHTML = "";
+    renderWatchlist();
+  }
+
+  async function renderWatchlist() {
+    const tbody = document.getElementById("watchlist");
+    tbody.innerHTML = "";
+
+    for (const stock of watchlist) {
+      const res = await fetch(`/api/stock?symbol=${stock.symbol}`);
+      const data = await res.json();
+
+      const tr = document.createElement("tr");
+      tr.innerHTML = `
+        <td>${stock.name}</td>
+        <td>₹ ${data.price}</td>
+        <td class="${data.change >= 0 ? "green" : "red"}">
+          ${data.change.toFixed(2)} (${data.changePercent.toFixed(2)}%)
+        </td>
+      `;
+      tbody.appendChild(tr);
     }
+  }
 
-    loadStock();
-  </script>
+  document.getElementById("search").addEventListener("input", e => {
+    const q = e.target.value.toLowerCase();
+    if (!q) return document.getElementById("dropdown").innerHTML = "";
+    const filtered = allStocks.filter(
+      s => s.name.toLowerCase().includes(q) || s.symbol.toLowerCase().includes(q)
+    );
+    renderDropdown(filtered);
+  });
+
+  loadStocks().then(renderWatchlist);
+</script>
 
 </body>
 </html>
