@@ -5,7 +5,6 @@
   <title>Stock Watchlist</title>
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
 
-  <!-- EmailJS -->
   <script src="https://cdn.jsdelivr.net/npm/emailjs-com@3/dist/email.min.js"></script>
 
   <style>
@@ -18,10 +17,7 @@
       --red: #dc2626;
       --accent: #2563eb;
       --border: #e2e8f0;
-      --radius: 14px;
     }
-
-    * { box-sizing: border-box; }
 
     body {
       margin: 0;
@@ -38,13 +34,9 @@
 
     h1 {
       font-size: 28px;
-      display: flex;
-      align-items: center;
-      gap: 12px;
       margin-bottom: 24px;
     }
 
-    /* Top controls */
     .controls {
       display: grid;
       grid-template-columns: 2fr 1fr;
@@ -54,7 +46,7 @@
 
     .card {
       background: var(--card);
-      border-radius: var(--radius);
+      border-radius: 14px;
       box-shadow: 0 12px 30px rgba(0,0,0,0.08);
       padding: 20px;
     }
@@ -65,24 +57,19 @@
       color: var(--muted);
     }
 
-    .search-box {
-      position: relative;
-    }
-
     input, select {
       width: 100%;
       padding: 14px;
       font-size: 15px;
       border-radius: 10px;
       border: 1px solid var(--border);
-      outline: none;
-      background: #fff;
     }
 
     input:focus, select:focus {
       border-color: var(--accent);
-      box-shadow: 0 0 0 3px rgba(37,99,235,0.15);
     }
+
+    .search-box { position: relative; }
 
     .dropdown {
       position: absolute;
@@ -99,22 +86,9 @@
     .option {
       padding: 12px 14px;
       cursor: pointer;
-      font-size: 14px;
     }
 
-    .option:hover {
-      background: #f1f5f9;
-    }
-
-    small {
-      color: var(--muted);
-      font-size: 12px;
-    }
-
-    /* Table */
-    .table-card {
-      margin-top: 20px;
-    }
+    .option:hover { background: #f1f5f9; }
 
     table {
       width: 100%;
@@ -125,20 +99,13 @@
     th {
       text-align: left;
       color: var(--muted);
-      font-weight: 600;
       border-bottom: 1px solid var(--border);
       padding: 12px;
-      white-space: nowrap;
     }
 
     td {
       padding: 14px 12px;
       border-bottom: 1px solid var(--border);
-      white-space: nowrap;
-    }
-
-    tbody tr:hover {
-      background: #f8fafc;
     }
 
     .green { color: var(--green); font-weight: 600; }
@@ -146,10 +113,9 @@
 
     .alert-input {
       width: 90px;
-      padding: 6px 8px;
+      padding: 6px;
       border-radius: 8px;
       border: 1px solid var(--border);
-      font-size: 13px;
     }
 
     .alert-set {
@@ -161,64 +127,52 @@
     .remove-btn {
       background: none;
       border: none;
-      cursor: pointer;
       font-size: 18px;
       color: #94a3b8;
+      cursor: pointer;
     }
 
-    .remove-btn:hover {
-      color: var(--red);
-    }
+    .remove-btn:hover { color: var(--red); }
 
-    /* Responsive */
     @media (max-width: 900px) {
-      .controls {
-        grid-template-columns: 1fr;
-      }
+      .controls { grid-template-columns: 1fr; }
     }
   </style>
 </head>
 
 <body>
 <div class="container">
-  <h1>📈 Stock Watchlist Dashboard</h1>
+  <h1>📈 Stock Watchlist</h1>
 
-  <!-- Top Controls -->
   <div class="controls">
-    <!-- Search + Sector -->
     <div class="card">
-      <h3>Search & Filter</h3>
+      <h3>Add Stock</h3>
       <div class="search-box">
         <input id="search" placeholder="Search stock by name or symbol…" />
         <div id="dropdown" class="dropdown"></div>
       </div>
-      <select id="sectorFilter" style="margin-top:12px">
+
+      <h3 style="margin-top:16px">Filter Watchlist by Sector</h3>
+      <select id="sectorFilter">
         <option value="ALL">All Sectors</option>
       </select>
     </div>
 
-    <!-- Email -->
     <div class="card">
       <h3>Email Alerts</h3>
-      <input
-        id="userEmail"
-        type="email"
-        placeholder="Enter your email for alerts"
-        style="margin-bottom:8px"
-      />
-      <small>
+      <input id="userEmail" type="email" placeholder="Enter your email" />
+      <small style="color:#64748b">
         Alerts trigger while this page is open
       </small>
     </div>
   </div>
 
-  <!-- Watchlist -->
-  <div class="card table-card">
+  <div class="card">
     <table>
       <thead>
         <tr>
           <th>Stock</th>
-          <th>Price (₹)</th>
+          <th>Price</th>
           <th>% Change</th>
           <th>52W High</th>
           <th>52W Low</th>
@@ -241,25 +195,22 @@
   let userEmail = localStorage.getItem("alertEmail") || "";
   let selectedSector = "ALL";
 
-  const emailInput = document.getElementById("userEmail");
-  emailInput.value = userEmail;
-  emailInput.addEventListener("change", e => {
+  document.getElementById("userEmail").value = userEmail;
+  document.getElementById("userEmail").addEventListener("change", e => {
     userEmail = e.target.value.trim();
     localStorage.setItem("alertEmail", userEmail);
   });
 
-  if ("Notification" in window && Notification.permission !== "granted") {
-    Notification.requestPermission();
-  }
-
   async function loadStocks() {
     const res = await fetch("/api/stocks");
     allStocks = await res.json();
+    populateSectorFilter();
   }
 
   function populateSectorFilter() {
     const select = document.getElementById("sectorFilter");
     const sectors = [...new Set(allStocks.map(s => s.sector).filter(Boolean))].sort();
+
     sectors.forEach(sector => {
       const opt = document.createElement("option");
       opt.value = sector;
@@ -269,15 +220,14 @@
 
     select.addEventListener("change", e => {
       selectedSector = e.target.value;
-      document.getElementById("dropdown").innerHTML = "";
-      document.getElementById("search").value = "";
+      renderWatchlist();
     });
   }
 
-  function renderDropdown(filtered) {
+  function renderDropdown(list) {
     const dropdown = document.getElementById("dropdown");
     dropdown.innerHTML = "";
-    filtered.slice(0, 12).forEach(stock => {
+    list.slice(0, 12).forEach(stock => {
       const div = document.createElement("div");
       div.className = "option";
       div.textContent = `${stock.name} (${stock.symbol})`;
@@ -304,54 +254,29 @@
   }
 
   function setAlert(symbol, price) {
-    price = Number(price);
     if (!price) return;
-    alerts.push({ symbol, price, triggered: false });
+    alerts.push({ symbol, price: Number(price), triggered: false });
     localStorage.setItem("alerts", JSON.stringify(alerts));
-    alert(`Alert set for ${symbol} at ₹${price}`);
-  }
-
-  function checkAlerts(prices) {
-    alerts.forEach(a => {
-      if (a.triggered) return;
-      const d = prices[a.symbol];
-      if (!d) return;
-
-      if (d.price >= a.price) {
-        a.triggered = true;
-        localStorage.setItem("alerts", JSON.stringify(alerts));
-
-        new Notification("Stock Alert 🚨", {
-          body: `${a.symbol} crossed ₹${a.price}`
-        });
-
-        if (userEmail) {
-          emailjs.send("service_38gmuds", "template_sem5vlb", {
-            to_email: userEmail,
-            symbol: a.symbol,
-            alert_price: a.price,
-            current_price: d.price.toFixed(2),
-            change: d.change.toFixed(2),
-            change_percent: d.changePercent.toFixed(2)
-          });
-        }
-      }
-    });
+    alert(`Alert set for ${symbol}`);
   }
 
   async function renderWatchlist() {
-    if (!watchlist.length) return;
-
-    const symbols = watchlist.map(s => s.symbol).join(",");
-    const res = await fetch(`/api/prices?symbols=${symbols}`);
-    const prices = await res.json();
-
-    checkAlerts(prices);
-
     const tbody = document.getElementById("watchlist");
     tbody.innerHTML = "";
 
-    watchlist.forEach(stock => {
+    let filtered = watchlist;
+    if (selectedSector !== "ALL") {
+      filtered = watchlist.filter(
+        w => allStocks.find(s => s.symbol === w.symbol)?.sector === selectedSector
+      );
+    }
+
+    if (!filtered.length) return;
+
+    const symbols = filtered.map(s => s.symbol).join(",");
+    const prices = await (await fetch(`/api/prices?symbols=${symbols}`)).json();
+
+    filtered.forEach(stock => {
       const d = prices[stock.symbol];
       if (!d) return;
 
@@ -360,7 +285,7 @@
       const tr = document.createElement("tr");
       tr.innerHTML = `
         <td>${stock.name}</td>
-        <td>${d.price.toFixed(2)}</td>
+        <td>₹ ${d.price.toFixed(2)}</td>
         <td class="${d.change >= 0 ? "green" : "red"}">${d.changePercent.toFixed(2)}%</td>
         <td>${d.high52}</td>
         <td>${d.low52}</td>
@@ -378,23 +303,18 @@
 
   document.getElementById("search").addEventListener("input", e => {
     const q = e.target.value.toLowerCase();
-    if (!q) {
-      document.getElementById("dropdown").innerHTML = "";
-      return;
-    }
+    if (!q) return document.getElementById("dropdown").innerHTML = "";
 
-    const filtered = allStocks.filter(
-      s =>
-        (s.name.toLowerCase().includes(q) ||
-         s.symbol.toLowerCase().includes(q)) &&
-        (selectedSector === "ALL" || s.sector === selectedSector)
+    renderDropdown(
+      allStocks.filter(
+        s =>
+          s.name.toLowerCase().includes(q) ||
+          s.symbol.toLowerCase().includes(q)
+      )
     );
-
-    renderDropdown(filtered);
   });
 
   loadStocks().then(() => {
-    populateSectorFilter();
     renderWatchlist();
     setInterval(renderWatchlist, 15000);
   });
