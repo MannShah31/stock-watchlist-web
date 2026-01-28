@@ -136,11 +136,27 @@
 <div class="container">
   <h1>📈 Stock Watchlist</h1>
 
+  <!-- Search -->
   <div class="search-box">
     <input id="search" placeholder="Search stock (Reliance, TCS, INFY…)" />
     <div id="dropdown" class="dropdown"></div>
   </div>
 
+  <!-- Email input -->
+  <div class="card">
+    <h3>Email Alerts</h3>
+    <input
+      id="userEmail"
+      type="email"
+      placeholder="Enter your email to receive alerts"
+      style="margin-bottom:8px"
+    />
+    <small style="color:#6b7280">
+      Alerts are sent while this page is open
+    </small>
+  </div>
+
+  <!-- Watchlist -->
   <div class="card">
     <table>
       <thead>
@@ -166,6 +182,14 @@
   let allStocks = [];
   let watchlist = JSON.parse(localStorage.getItem("watchlist") || "[]");
   let alerts = JSON.parse(localStorage.getItem("alerts") || "[]");
+  let userEmail = localStorage.getItem("alertEmail") || "";
+
+  const emailInput = document.getElementById("userEmail");
+  emailInput.value = userEmail;
+  emailInput.addEventListener("change", e => {
+    userEmail = e.target.value.trim();
+    localStorage.setItem("alertEmail", userEmail);
+  });
 
   if ("Notification" in window && Notification.permission !== "granted") {
     Notification.requestPermission();
@@ -227,13 +251,16 @@
           body: `${a.symbol} crossed ₹${a.price}`
         });
 
-        emailjs.send("service_38gmuds", "template_sem5vlb", {
-          symbol: a.symbol,
-          alert_price: a.price,
-          current_price: d.price.toFixed(2),
-          change: d.change.toFixed(2),
-          change_percent: d.changePercent.toFixed(2)
-        });
+        if (userEmail) {
+          emailjs.send("service_38gmuds", "template_sem5vlb", {
+            to_email: userEmail,
+            symbol: a.symbol,
+            alert_price: a.price,
+            current_price: d.price.toFixed(2),
+            change: d.change.toFixed(2),
+            change_percent: d.changePercent.toFixed(2)
+          });
+        }
       }
     });
   }
