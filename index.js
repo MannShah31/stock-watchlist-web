@@ -88,6 +88,72 @@ app.get("/api/stocks", (req, res) => {
   }
 });
 
+// 🔥 BATCH STOCK PRICES (MULTIPLE SYMBOLS)
+app.get("/api/prices", (req, res) => {
+  const symbols = req.query.symbols;
+
+  if (!symbols) {
+    return res.status(400).json({ error: "Missing symbols" });
+  }
+
+  const url = `https://query1.finance.yahoo.com/v8/finance/chart/${symbols}?interval=1m&range=1d`;
+
+  https.get(
+    url,
+    {
+      headers: {
+        "User-Agent": "Mozilla/5.0",
+        Accept: "application/json"
+      }
+    },
+    response => {
+      let raw = "";
+
+      response.on("data", chunk => {
+        raw += chunk;
+      });
+
+      response.on("end", () => {
+        try {
+          const json = JSON.parse(raw);
+          const results = json.chart?.result;
+
+          if (!results || !results.length) {
+            return res.status(404).json({ error: "No data returned" });
+          }
+
+          const prices = {};
+
+          results.forEach(r => {
+            const m = r.meta;
+            prices[m.symbol] = {
+              price: m.regularMarketPrice,
+              previousClose: m.chartPreviousClose,
+              change: m.regularMarketPrice - m.chartPreviousClose,
+              changePercent:
+                ((m.regularMarketPrice - m.chartPreviousClose) /
+                  m.chartPreviousClose) *
+                100,
+              high52: m.fiftyTwoWeekHigh,
+              low52: m.fiftyTwoWeekLow,
+              volume: m.regularMarketVolume
+            };
+          });
+
+          res.json(prices);
+        } catch (err) {
+          console.error("Batch parse error:", err.message);
+          res.status(500).json({ error: "Failed to parse batch data" });
+        }
+      });
+    }
+  ).on("error", err => {
+    console.error("Batch request failed:", err.message);
+    res.status(500).json({ error: "Batch request failed" });
+  });
+});
+
+
 // Start server
 app.listen(PORT, HOST, () => {
   console.log(`Server running on ${HOST}:${PORT}`);
