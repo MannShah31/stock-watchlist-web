@@ -14,40 +14,24 @@ app.get("/api/health", (req, res) => {
   res.json({ status: "ok" });
 });
 
-// 🔥 DYNAMIC STOCK PRICE API
+// 🔥 SINGLE STOCK (CHART API)
 app.get("/api/stock", (req, res) => {
   const symbol = req.query.symbol;
-
-  if (!symbol) {
-    return res.status(400).json({ error: "Missing symbol" });
-  }
+  if (!symbol) return res.status(400).json({ error: "Missing symbol" });
 
   const url = `https://query1.finance.yahoo.com/v8/finance/chart/${symbol}?interval=1m&range=1d`;
 
   https.get(
     url,
-    {
-      headers: {
-        "User-Agent": "Mozilla/5.0",
-        Accept: "application/json"
-      }
-    },
+    { headers: { "User-Agent": "Mozilla/5.0" } },
     response => {
       let raw = "";
-
-      response.on("data", chunk => {
-        raw += chunk;
-      });
-
+      response.on("data", d => (raw += d));
       response.on("end", () => {
         try {
           const json = JSON.parse(raw);
-
-          if (!json.chart?.result?.length) {
-            return res.status(404).json({ error: "Stock data not found" });
-          }
-
-          const meta = json.chart.result[0].meta;
+          const meta = json.chart?.result?.[0]?.meta;
+          if (!meta) return res.status(404).json({ error: "No data" });
 
           res.json({
             symbol: meta.symbol,
@@ -60,99 +44,67 @@ app.get("/api/stock", (req, res) => {
               100,
             high52: meta.fiftyTwoWeekHigh,
             low52: meta.fiftyTwoWeekLow,
-            volume: meta.regularMarketVolume,
-            exchange: meta.exchangeName,
-            currency: meta.currency
+            volume: meta.regularMarketVolume
           });
-        } catch (err) {
-          console.error("Parse error:", err.message);
-          res.status(500).json({ error: "Failed to parse stock data" });
+        } catch {
+          res.status(500).json({ error: "Parse error" });
         }
       });
     }
-  ).on("error", err => {
-    console.error("Request failed:", err.message);
-    res.status(500).json({ error: "Stock request failed" });
-  });
+  );
 });
 
-// 🔽 STOCK MASTER LIST (DROPDOWN)
-app.get("/api/stocks", (req, res) => {
-  try {
-    const filePath = path.join(__dirname, "stocks.json");
-    const data = fs.readFileSync(filePath, "utf-8");
-    const stocks = JSON.parse(data);
-    res.json(stocks);
-  } catch (err) {
-    res.status(500).json({ error: "Failed to load stock list" });
-  }
-});
-
-// 🔥 BATCH STOCK PRICES (MULTIPLE SYMBOLS)
+// 🔥 BATCH STOCK PRICES (QUOTE API — CORRECT)
 app.get("/api/prices", (req, res) => {
   const symbols = req.query.symbols;
+  if (!symbols) return res.status(400).json({ error: "Missing symbols" });
 
-  if (!symbols) {
-    return res.status(400).json({ error: "Missing symbols" });
-  }
-
-  const url = `https://query1.finance.yahoo.com/v8/finance/chart/${symbols}?interval=1m&range=1d`;
+  const url = `https://query1.finance.yahoo.com/v7/finance/quote?symbols=${symbols}`;
 
   https.get(
     url,
-    {
-      headers: {
-        "User-Agent": "Mozilla/5.0",
-        Accept: "application/json"
-      }
-    },
+    { headers: { "User-Agent": "Mozilla/5.0" } },
     response => {
       let raw = "";
-
-      response.on("data", chunk => {
-        raw += chunk;
-      });
-
+      response.on("data", d => (raw += d));
       response.on("end", () => {
         try {
           const json = JSON.parse(raw);
-          const results = json.chart?.result;
-
-          if (!results || !results.length) {
+          const results = json.quoteResponse?.result;
+          if (!results || !results.length)
             return res.status(404).json({ error: "No data returned" });
-          }
 
           const prices = {};
-
           results.forEach(r => {
-            const m = r.meta;
-            prices[m.symbol] = {
-              price: m.regularMarketPrice,
-              previousClose: m.chartPreviousClose,
-              change: m.regularMarketPrice - m.chartPreviousClose,
-              changePercent:
-                ((m.regularMarketPrice - m.chartPreviousClose) /
-                  m.chartPreviousClose) *
-                100,
-              high52: m.fiftyTwoWeekHigh,
-              low52: m.fiftyTwoWeekLow,
-              volume: m.regularMarketVolume
+            prices[r.symbol] = {
+              price: r.regularMarketPrice,
+              previousClose: r.regularMarketPreviousClose,
+              change: r.regularMarketChange,
+              changePercent: r.regularMarketChangePercent,
+              high52: r.fiftyTwoWeekHigh,
+              low52: r.fiftyTwoWeekLow,
+              volume: r.regularMarketVolume
             };
           });
 
           res.json(prices);
-        } catch (err) {
-          console.error("Batch parse error:", err.message);
-          res.status(500).json({ error: "Failed to parse batch data" });
+        } catch {
+          res.status(500).json({ error: "Batch parse failed" });
         }
       });
     }
-  ).on("error", err => {
-    console.error("Batch request failed:", err.message);
-    res.status(500).json({ error: "Batch request failed" });
-  });
+  );
 });
 
+// 🔽 STOCK MASTER LIST
+app.get("/api/stocks", (req, res) => {
+  try {
+    const data = fs.readFileSync(path.join(__dirname, "stocks.json"), "utf-8");
+    res.json(JSON.parse(data));
+  } catch {
+    res.status(500).json({ error: "Stock list failed" });
+  }
+});
 
 // Start server
 app.listen(PORT, HOST, () => {
