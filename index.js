@@ -14,10 +14,15 @@ app.get("/api/health", (req, res) => {
   res.json({ status: "ok" });
 });
 
-// 🔥 SINGLE STOCK (RELIANCE)
+// 🔥 DYNAMIC STOCK PRICE API
 app.get("/api/stock", (req, res) => {
-  const url =
-    "https://query1.finance.yahoo.com/v8/finance/chart/RELIANCE.NS?interval=1m&range=1d";
+  const symbol = req.query.symbol;
+
+  if (!symbol) {
+    return res.status(400).json({ error: "Missing symbol" });
+  }
+
+  const url = `https://query1.finance.yahoo.com/v8/finance/chart/${symbol}?interval=1m&range=1d`;
 
   https.get(
     url,
@@ -39,7 +44,7 @@ app.get("/api/stock", (req, res) => {
           const json = JSON.parse(raw);
 
           if (!json.chart?.result?.length) {
-            return res.status(503).json({ error: "No stock data returned" });
+            return res.status(404).json({ error: "Stock data not found" });
           }
 
           const meta = json.chart.result[0].meta;
@@ -60,18 +65,18 @@ app.get("/api/stock", (req, res) => {
             currency: meta.currency
           });
         } catch (err) {
-          console.error("Yahoo parse failed:", err.message);
-          res.status(500).json({ error: "Yahoo response not usable" });
+          console.error("Parse error:", err.message);
+          res.status(500).json({ error: "Failed to parse stock data" });
         }
       });
     }
   ).on("error", err => {
-    console.error("Yahoo request failed:", err.message);
-    res.status(500).json({ error: "Yahoo request failed" });
+    console.error("Request failed:", err.message);
+    res.status(500).json({ error: "Stock request failed" });
   });
 });
 
-// 🔽 STOCK MASTER LIST (FOR DROPDOWN)
+// 🔽 STOCK MASTER LIST (DROPDOWN)
 app.get("/api/stocks", (req, res) => {
   try {
     const filePath = path.join(__dirname, "stocks.json");
@@ -79,7 +84,6 @@ app.get("/api/stocks", (req, res) => {
     const stocks = JSON.parse(data);
     res.json(stocks);
   } catch (err) {
-    console.error("Failed to load stocks.json:", err.message);
     res.status(500).json({ error: "Failed to load stock list" });
   }
 });
