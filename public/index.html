@@ -5,99 +5,108 @@
 <title>Stock Watchlist</title>
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
 
+<!-- Firebase -->
 <script src="https://www.gstatic.com/firebasejs/12.8.0/firebase-app.js"></script>
 <script src="https://www.gstatic.com/firebasejs/12.8.0/firebase-auth.js"></script>
 
+<!-- EmailJS -->
+<script src="https://cdn.jsdelivr.net/npm/emailjs-com@3/dist/email.min.js"></script>
+
 <style>
-body {
-  margin: 0;
-  font-family: Inter, Arial, sans-serif;
-  background: #f4f6fb;
-}
-
+body { margin:0; font-family:Inter,Arial; background:#f4f6fb; }
+.hidden { display:none; }
 header {
-  background: #2563eb;
-  color: white;
-  padding: 16px 24px;
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
+  background:#2563eb; color:white; padding:16px 24px;
+  display:flex; justify-content:space-between; align-items:center;
 }
-
-.container {
-  max-width: 1200px;
-  margin: auto;
-  padding: 32px;
-}
+.container { max-width:1200px; margin:auto; padding:24px; }
 
 .card {
-  background: white;
-  padding: 24px;
-  border-radius: 14px;
-  box-shadow: 0 10px 30px rgba(0,0,0,0.08);
+  background:white; border-radius:14px;
+  box-shadow:0 15px 40px rgba(0,0,0,.08);
+  padding:20px; margin-bottom:24px;
 }
 
-.center {
-  height: 100vh;
-  display: flex;
-  justify-content: center;
-  align-items: center;
-}
-
-input, button {
-  width: 100%;
-  padding: 12px;
-  margin-top: 10px;
-  font-size: 15px;
+input, select {
+  width:100%; padding:12px; border-radius:8px;
+  border:1px solid #ddd; margin-top:8px;
 }
 
 button {
-  background: #2563eb;
-  color: white;
-  border: none;
-  border-radius: 8px;
-  cursor: pointer;
+  background:#2563eb; border:none; color:white;
+  padding:10px 14px; border-radius:8px; cursor:pointer;
 }
 
-button.secondary {
-  background: #4f46e5;
-}
+table { width:100%; border-collapse:collapse; }
+th,td { padding:12px; border-bottom:1px solid #eee; }
+.green { color:#16a34a; font-weight:600; }
+.red { color:#dc2626; font-weight:600; }
 
-.hidden { display: none; }
+.dropdown {
+  position:absolute; background:white; border:1px solid #ddd;
+  width:100%; max-height:200px; overflow-y:auto; z-index:10;
+}
+.option { padding:10px; cursor:pointer; }
+.option:hover { background:#f1f5f9; }
 </style>
 </head>
 
 <body>
 
-<!-- LOGIN SCREEN -->
-<div id="authScreen" class="center">
+<!-- AUTH SCREEN -->
+<div id="authScreen" style="height:100vh;display:flex;justify-content:center;align-items:center;">
   <div class="card" style="width:340px;">
     <h2>Login / Sign Up</h2>
-    <input id="email" type="email" placeholder="Email" />
-    <input id="password" type="password" placeholder="Password" />
+    <input id="email" placeholder="Email">
+    <input id="password" type="password" placeholder="Password">
     <button onclick="login()">Login</button>
-    <button class="secondary" onclick="signup()">Sign Up</button>
+    <button onclick="signup()" style="margin-top:8px;background:#4f46e5">Sign Up</button>
   </div>
 </div>
 
 <!-- DASHBOARD -->
 <div id="appScreen" class="hidden">
-  <header>
-    <h3>📈 Stock Watchlist</h3>
-    <button onclick="logout()">Logout</button>
-  </header>
+<header>
+  <h3>📈 Stock Watchlist</h3>
+  <button onclick="logout()">Logout</button>
+</header>
 
-  <div class="container">
-    <div class="card">
-      <h3>Welcome! Your dashboard is ready 🚀</h3>
-      <p>Now we’ll plug your stock UI here next.</p>
-    </div>
+<div class="container">
+
+  <!-- Search -->
+  <div class="card" style="position:relative;">
+    <input id="search" placeholder="Search stocks...">
+    <div id="dropdown" class="dropdown"></div>
   </div>
+
+  <!-- Email -->
+  <div class="card">
+    <h4>Email Alerts</h4>
+    <input id="userEmail" type="email" placeholder="Enter email for alerts">
+    <small>Alerts work while this page is open</small>
+  </div>
+
+  <!-- Watchlist -->
+  <div class="card">
+    <table>
+      <thead>
+        <tr>
+          <th>Stock</th><th>Price</th><th>%</th>
+          <th>52W H</th><th>52W L</th><th>Volume</th><th>Alert</th><th></th>
+        </tr>
+      </thead>
+      <tbody id="watchlist"></tbody>
+    </table>
+  </div>
+
+</div>
 </div>
 
 <script type="module">
 import { initializeApp } from "https://www.gstatic.com/firebasejs/12.8.0/firebase-app.js";
 import { getAuth, signInWithEmailAndPassword, createUserWithEmailAndPassword, onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/12.8.0/firebase-auth.js";
+
+emailjs.init("-nPbEj5p827UiuqEA");
 
 const firebaseConfig = {
   apiKey: "AIzaSyCd2vJNlGVh9q1GWT2M_GepSKolo-t2Sr4",
@@ -115,26 +124,98 @@ const authScreen = document.getElementById("authScreen");
 const appScreen = document.getElementById("appScreen");
 
 onAuthStateChanged(auth, user => {
-  if (user) {
-    authScreen.classList.add("hidden");
-    appScreen.classList.remove("hidden");
-  } else {
-    appScreen.classList.add("hidden");
-    authScreen.classList.remove("hidden");
-  }
+  if(user){ authScreen.classList.add("hidden"); appScreen.classList.remove("hidden"); }
+  else { appScreen.classList.add("hidden"); authScreen.classList.remove("hidden"); }
 });
 
-window.login = () => {
-  signInWithEmailAndPassword(auth, email.value, password.value)
-    .catch(e => alert(e.message));
-};
-
-window.signup = () => {
-  createUserWithEmailAndPassword(auth, email.value, password.value)
-    .catch(e => alert(e.message));
-};
-
+window.login = () => signInWithEmailAndPassword(auth,email.value,password.value).catch(e=>alert(e.message));
+window.signup = () => createUserWithEmailAndPassword(auth,email.value,password.value).catch(e=>alert(e.message));
 window.logout = () => signOut(auth);
+
+// ----- STOCK LOGIC -----
+let allStocks=[], watchlist=JSON.parse(localStorage.getItem("watchlist")||"[]");
+let alerts=JSON.parse(localStorage.getItem("alerts")||"[]");
+let userEmail=localStorage.getItem("alertEmail")||"";
+
+userEmailInput();
+async function userEmailInput(){
+  const el=document.getElementById("userEmail");
+  el.value=userEmail;
+  el.onchange=e=>{ userEmail=e.target.value; localStorage.setItem("alertEmail",userEmail); };
+}
+
+async function loadStocks(){ allStocks=await (await fetch("/api/stocks")).json(); }
+
+function renderDropdown(list){
+  const d=document.getElementById("dropdown"); d.innerHTML="";
+  list.slice(0,10).forEach(s=>{
+    const o=document.createElement("div");
+    o.className="option"; o.textContent=`${s.name} (${s.symbol})`;
+    o.onclick=()=>addStock(s); d.appendChild(o);
+  });
+}
+
+function addStock(s){
+  if(watchlist.find(x=>x.symbol===s.symbol)) return;
+  watchlist.push(s); localStorage.setItem("watchlist",JSON.stringify(watchlist));
+  dropdown.innerHTML=""; search.value=""; renderWatchlist();
+}
+
+function removeStock(sym){
+  watchlist=watchlist.filter(s=>s.symbol!==sym);
+  alerts=alerts.filter(a=>a.symbol!==sym);
+  localStorage.setItem("watchlist",JSON.stringify(watchlist));
+  localStorage.setItem("alerts",JSON.stringify(alerts));
+  renderWatchlist();
+}
+
+function setAlert(sym,val){
+  alerts.push({symbol:sym,price:+val,triggered:false});
+  localStorage.setItem("alerts",JSON.stringify(alerts));
+}
+
+function checkAlerts(prices){
+  alerts.forEach(a=>{
+    if(a.triggered) return;
+    const d=prices[a.symbol];
+    if(d && d.price>=a.price){
+      a.triggered=true; localStorage.setItem("alerts",JSON.stringify(alerts));
+      if(userEmail) emailjs.send("service_38gmuds","template_sem5vlb",{
+        to_email:userEmail,symbol:a.symbol,alert_price:a.price,current_price:d.price
+      });
+    }
+  });
+}
+
+async function renderWatchlist(){
+  if(!watchlist.length) return;
+  const symbols=watchlist.map(s=>s.symbol).join(",");
+  const prices=await (await fetch(`/api/prices?symbols=${symbols}`)).json();
+  checkAlerts(prices);
+
+  const tb=document.getElementById("watchlist"); tb.innerHTML="";
+  watchlist.forEach(s=>{
+    const d=prices[s.symbol]; if(!d) return;
+    const tr=document.createElement("tr");
+    tr.innerHTML=`
+      <td>${s.name}</td>
+      <td>${d.price.toFixed(2)}</td>
+      <td class="${d.change>=0?"green":"red"}">${d.changePercent.toFixed(2)}%</td>
+      <td>${d.high52}</td><td>${d.low52}</td>
+      <td>${d.volume.toLocaleString()}</td>
+      <td><input type="number" placeholder="₹" onkeydown="if(event.key==='Enter')setAlert('${s.symbol}',this.value)"></td>
+      <td><button onclick="removeStock('${s.symbol}')">✕</button></td>`;
+    tb.appendChild(tr);
+  });
+}
+
+search.oninput=e=>{
+  const q=e.target.value.toLowerCase();
+  if(!q) return dropdown.innerHTML="";
+  renderDropdown(allStocks.filter(s=>s.name.toLowerCase().includes(q)||s.symbol.toLowerCase().includes(q)));
+};
+
+loadStocks().then(()=>{ renderWatchlist(); setInterval(renderWatchlist,15000); });
 </script>
 
 </body>
