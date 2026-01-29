@@ -2,7 +2,8 @@ const express = require("express");
 const https = require("https");
 const fs = require("fs");
 const path = require("path");
-const nodemailer = require("nodemailer");
+const fetch = (...args) =>
+  import("node-fetch").then(({ default: fetch }) => fetch(...args));
 
 const app = express();
 app.use(express.json());
@@ -11,22 +12,12 @@ app.use(express.static("public"));
 const PORT = process.env.PORT || 3000;
 const HOST = "0.0.0.0";
 
-// --------------------
-// Gmail Mailer
-// --------------------
-const mailer = nodemailer.createTransport({
-  service: "gmail",
-  auth: {
-    user: process.env.EMAIL_USER,
-    pass: process.env.EMAIL_PASS
-  }
-});
-
-// verify on startup
-mailer.verify(err => {
-  if (err) console.error("❌ Mailer error:", err);
-  else console.log("✅ Mail server ready");
-});
+// =====================
+// EmailJS config
+// =====================
+const EMAILJS_SERVICE = process.env.EMAILJS_SERVICE;
+const EMAILJS_TEMPLATE = process.env.EMAILJS_TEMPLATE;
+const EMAILJS_PUBLIC = process.env.EMAILJS_PUBLIC;
 
 // --------------------
 // Health
@@ -71,32 +62,40 @@ function fetchSingleStock(symbol) {
 }
 
 // --------------------
-// SEND MAIL ONLY
+// SEND EMAIL via EmailJS
 // --------------------
 app.post("/api/alert", async (req, res) => {
-  const { email, symbol, target, price } = req.body;
+  const { email, symbol, target, price, change, changePercent } = req.body;
 
   if (!email || !symbol || !target || !price) {
     return res.status(400).json({ error: "Missing fields" });
   }
 
   try {
-    await mailer.sendMail({
-      from: `"Stock Watchlist" <${process.env.EMAIL_USER}>`,
-      to: email,
-      subject: `🚨 ${symbol} crossed ₹${target}`,
-      html: `
-        <h2>Stock Alert Triggered</h2>
-        <p><b>${symbol}</b> crossed your target.</p>
-        <p>Target: ₹${target}</p>
-        <p>Current: ₹${price}</p>
-      `
+    const response = await fetch("https://api.emailjs.com/api/v1.0/email/send", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        service_id: EMAILJS_SERVICE,
+        template_id: EMAILJS_TEMPLATE,
+        user_id: EMAILJS_PUBLIC,
+        template_params: {
+          to_email: email,
+          symbol,
+          alert_price: target,
+          current_price: price,
+          change,
+          change_percent: changePercent
+        }
+      })
     });
 
-    console.log("📧 MAIL SENT →", email);
+    if (!response.ok) throw new Error("EmailJS failed");
+
+    console.log("📧 EMAIL SENT →", email);
     res.json({ ok: true });
   } catch (err) {
-    console.error("❌ MAIL FAILED:", err);
+    console.error("❌ EMAILJS ERROR:", err.message);
     res.status(500).json({ error: "Mail failed" });
   }
 });
@@ -131,7 +130,7 @@ app.get("/api/stocks", (req, res) => {
 });
 
 app.get("/api/version", (_, res) => {
-  res.json({ version: "fan-out-v1 + mailer + frontend-triggers" });
+  res.json({ version: "fan-out-v1 + emailjs" });
 });
 
 app.listen(PORT, HOST, () => {
