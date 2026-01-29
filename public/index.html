@@ -9,8 +9,19 @@
 
 <script type="module">
 import { initializeApp } from "https://www.gstatic.com/firebasejs/12.8.0/firebase-app.js";
-import { getAuth, createUserWithEmailAndPassword, signInWithEmailAndPassword, onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/12.8.0/firebase-auth.js";
-import { getFirestore, doc, setDoc, getDoc } from "https://www.gstatic.com/firebasejs/12.8.0/firebase-firestore.js";
+import {
+  getAuth,
+  createUserWithEmailAndPassword,
+  signInWithEmailAndPassword,
+  onAuthStateChanged,
+  signOut
+} from "https://www.gstatic.com/firebasejs/12.8.0/firebase-auth.js";
+import {
+  getFirestore,
+  doc,
+  setDoc,
+  getDoc
+} from "https://www.gstatic.com/firebasejs/12.8.0/firebase-firestore.js";
 
 const firebaseConfig = {
   apiKey: "AIzaSyCd2vJNlGVh9q1GWT2M_GepSKolo-t2Sr4",
@@ -31,15 +42,36 @@ let userId = null;
 let watchlist = [];
 
 window.signup = async function () {
-  const email = document.getElementById("email").value;
-  const pass = document.getElementById("password").value;
-  await createUserWithEmailAndPassword(auth, email, pass);
+  try {
+    const email = document.getElementById("email").value;
+    const pass = document.getElementById("password").value;
+
+    if (!email || !pass) {
+      alert("Enter email and password");
+      return;
+    }
+
+    await createUserWithEmailAndPassword(auth, email, pass);
+    alert("Account created successfully!");
+  } catch (err) {
+    alert("Signup failed: " + err.message);
+  }
 };
 
 window.login = async function () {
-  const email = document.getElementById("email").value;
-  const pass = document.getElementById("password").value;
-  await signInWithEmailAndPassword(auth, email, pass);
+  try {
+    const email = document.getElementById("email").value;
+    const pass = document.getElementById("password").value;
+
+    if (!email || !pass) {
+      alert("Enter email and password");
+      return;
+    }
+
+    await signInWithEmailAndPassword(auth, email, pass);
+  } catch (err) {
+    alert("Login failed: " + err.message);
+  }
 };
 
 window.logout = async function () {
@@ -82,9 +114,11 @@ function remove(sym) {
 
 function render() {
   const box = document.getElementById("watchlistBox");
-  box.innerHTML = watchlist.map(s =>
-    `<div>${s} <button onclick="remove('${s}')">✕</button></div>`
-  ).join("");
+  box.innerHTML = watchlist
+    .map(
+      s => `<div>${s} <button onclick="remove('${s}')">✕</button></div>`
+    )
+    .join("");
 }
 
 window.remove = remove;
@@ -92,9 +126,14 @@ window.add = add;
 </script>
 
 <style>
+body { font-family: Inter, Arial; background:#f4f6fb; padding:40px }
 .hidden { display:none }
-.card { background:#fff;padding:20px;border-radius:12px;max-width:400px;margin:auto }
-button{background:#2563eb;color:white;padding:8px;border:none;border-radius:6px}
+.card {
+  background:#fff; padding:20px; border-radius:12px;
+  max-width:400px; margin:auto; box-shadow:0 10px 25px rgba(0,0,0,.1)
+}
+button { background:#2563eb;color:white;padding:10px;border:none;border-radius:6px;margin-right:6px }
+input { padding:10px;width:100%;margin-bottom:10px }
 </style>
 </head>
 
@@ -103,15 +142,19 @@ button{background:#2563eb;color:white;padding:8px;border:none;border-radius:6px}
 <div id="authBox" class="card">
   <h2>Login / Sign Up</h2>
   <input id="email" placeholder="Email">
-  <input id="password" type="password" placeholder="Password">
+  <input id="password" type="password" placeholder="Password (min 6 chars)">
   <button onclick="login()">Login</button>
   <button onclick="signup()">Sign Up</button>
 </div>
 
 <div id="app" class="hidden">
-  <h1>Welcome</h1>
-  <button onclick="logout()">Logout</button>
-  <div id="watchlistBox"></div>
+  <div class="card">
+    <h2>Your Watchlist</h2>
+    <button onclick="add('RELIANCE.NS')">Add RELIANCE</button>
+    <button onclick="add('TCS.NS')">Add TCS</button>
+    <div id="watchlistBox"></div>
+    <button onclick="logout()">Logout</button>
+  </div>
 </div>
 
 </body>
