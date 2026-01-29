@@ -27,7 +27,7 @@ button{background:#2563eb;color:white;border:none;border-radius:8px;padding:10px
 .green{color:#16a34a;font-weight:600}
 .red{color:#dc2626;font-weight:600}
 .alert-card{background:white;padding:22px;border-radius:18px;box-shadow:0 10px 30px rgba(0,0,0,.08)}
-.alert-row{display:flex;justify-content:space-between;align-items:center;border-bottom:1px solid #eee;padding:12px 0}
+.alert-row{display:grid;grid-template-columns:1fr 1fr 1fr 2fr 2fr 50px;gap:8px;align-items:center;border-bottom:1px solid #eee;padding:10px 0}
 .alert-chip{background:#eef2ff;color:#1d4ed8;padding:6px 14px;border-radius:999px;font-weight:600;font-size:13px}
 </style>
 </head>
@@ -37,8 +37,8 @@ button{background:#2563eb;color:white;border:none;border-radius:8px;padding:10px
 <div id="loginScreen" class="login-wrap">
   <div class="login-card">
     <h2>Login / Sign Up</h2>
-    <input id="email">
-    <input id="password" type="password">
+    <input id="email" placeholder="Email">
+    <input id="password" type="password" placeholder="Password">
     <button id="loginBtn">Login</button>
     <button id="signupBtn">Sign Up</button>
   </div>
@@ -69,11 +69,13 @@ button{background:#2563eb;color:white;border:none;border-radius:8px;padding:10px
 <div id="alertsTab" style="display:none">
   <div class="alert-card">
     <h3>🔔 Price Alerts</h3>
+
     <div style="display:flex;gap:10px;margin-bottom:14px">
       <select id="alertSymbol" style="flex:1;padding:10px"></select>
       <input id="alertPrice" type="number" placeholder="Target Price" style="flex:1;padding:10px">
       <button id="addAlertBtn">Add</button>
     </div>
+
     <div id="alertList"></div>
   </div>
 </div>
@@ -97,34 +99,59 @@ const db = getFirestore(app);
 
 let allStocks=[], watchlist=[], alerts=[], userId=null;
 
+/* AUTH */
 loginBtn.onclick=()=>signInWithEmailAndPassword(auth,email.value,password.value);
 signupBtn.onclick=()=>createUserWithEmailAndPassword(auth,email.value,password.value);
 logoutBtn.onclick=()=>signOut(auth);
 
 onAuthStateChanged(auth,async u=>{
-  if(!u) return;
+  if(!u)return;
   userId=u.uid;
   loginScreen.style.display="none";
   appScreen.style.display="block";
 
   allStocks=await (await fetch("/api/stocks")).json();
-
   const snap=await getDoc(doc(db,"users",userId));
   if(snap.exists()) watchlist=snap.data().watchlist||[];
 
   render();
   loadAlerts();
+  setInterval(render,15000);
+  setInterval(checkAlerts,30000);
+});
 
-  setInterval(render,15000);       // auto refresh prices
-  setInterval(checkAlerts,30000); // auto check alerts
+/* TABS */
+tabWatch.onclick=()=>{watchTab.style.display="block";alertsTab.style.display="none"};
+tabAlerts.onclick=()=>{watchTab.style.display="none";alertsTab.style.display="block";populateAlertDropdown();renderAlerts()};
+
+/* SEARCH */
+search.addEventListener("input",e=>{
+  const q=e.target.value.toLowerCase();
+  dropdown.innerHTML="";
+  if(!q)return;
+  allStocks.filter(s=>s.name.toLowerCase().includes(q)||s.symbol.toLowerCase().includes(q))
+    .slice(0,10).forEach(s=>{
+      const d=document.createElement("div");
+      d.className="option";
+      d.textContent=`${s.name} (${s.symbol})`;
+      d.onclick=()=>addStock(s);
+      dropdown.appendChild(d);
+    });
 });
 
 /* WATCHLIST */
+async function addStock(s){
+  if(watchlist.find(x=>x.symbol===s.symbol))return;
+  watchlist.push(s);
+  await setDoc(doc(db,"users",userId),{watchlist},{merge:true});
+  dropdown.innerHTML="";search.value="";
+  render();
+}
+
 async function render(){
   if(!watchlist.length)return;
   const syms=watchlist.map(s=>s.symbol).join(",");
   const data=await (await fetch(`/api/prices?symbols=${syms}`)).json();
-
   stockGrid.innerHTML="";
   watchlist.forEach(s=>{
     const d=data[s.symbol]; if(!d)return;
@@ -137,11 +164,8 @@ async function render(){
       </div>
       <div class="price">₹${d.price.toFixed(2)}</div>
       <div class="${d.change>=0?'green':'red'}">${d.changePercent.toFixed(2)}%</div>
-      <div class="meta">
-        <div>52W H<br><b>${d.high52}</b></div>
-        <div>52W L<br><b>${d.low52}</b></div>
-        <div>Vol<br><b>${d.volume.toLocaleString()}</b></div>
-      </div>`;
+      <div>52W H: ${d.high52} | 52W L: ${d.low52}</div>
+      <div>Vol: ${d.volume.toLocaleString()}</div>`;
     stockGrid.appendChild(div);
   });
 }
@@ -153,6 +177,28 @@ window.removeStock=async sym=>{
 };
 
 /* ALERTS */
+function populateAlertDropdown(){
+  alertSymbol.innerHTML="";
+  watchlist.forEach(s=>{
+    const o=document.createElement("option");
+    o.value=s.symbol;
+    o.textContent=`${s.name} (${s.symbol})`;
+    alertSymbol.appendChild(o);
+  });
+}
+
+addAlertBtn.onclick=async ()=>{
+  const s=alertSymbol.value;
+  const p=+alertPrice.value;
+  if(!s||!p)return alert("Fill both");
+  await addDoc(collection(db,"users",userId,"alerts"),{
+    symbol:s,price:p,email:auth.currentUser.email,
+    triggered:false,createdAt:serverTimestamp(),triggeredAt:null
+  });
+  alertPrice.value="";
+  loadAlerts();
+};
+
 async function loadAlerts(){
   alerts=[];
   const snap=await getDocs(collection(db,"users",userId,"alerts"));
@@ -160,38 +206,20 @@ async function loadAlerts(){
   renderAlerts();
 }
 
-addAlertBtn.onclick=async ()=>{
-  const s=alertSymbol.value;
-  const p=+alertPrice.value;
-  if(!s||!p)return alert("Fill both");
-
-  await addDoc(collection(db,"users",userId,"alerts"),{
-    symbol:s,
-    price:p,
-    email:auth.currentUser.email,
-    triggered:false,
-    createdAt: serverTimestamp(),
-    triggeredAt: null
-  });
-
-  alertPrice.value="";
-  loadAlerts();
-};
-
 function renderAlerts(){
   alertList.innerHTML="";
   alerts.forEach(a=>{
-    const row=document.createElement("div");
-    row.className="alert-row";
-    row.innerHTML=`
+    const r=document.createElement("div");
+    r.className="alert-row";
+    r.innerHTML=`
       <span class="alert-chip">${a.symbol}</span>
       <span>₹${a.price}</span>
       <span>${a.triggered?"Triggered":"Pending"}</span>
       <span>${a.createdAt?.toDate?.().toLocaleString()||""}</span>
       <span>${a.triggeredAt?.toDate?.().toLocaleString()||"-"}</span>
       <button>✕</button>`;
-    row.querySelector("button").onclick=()=>deleteAlert(a.id);
-    alertList.appendChild(row);
+    r.querySelector("button").onclick=()=>deleteAlert(a.id);
+    alertList.appendChild(r);
   });
 }
 
@@ -203,32 +231,16 @@ async function deleteAlert(id){
 /* AUTO CHECK */
 async function checkAlerts(){
   if(!alerts.length)return;
-
   const syms=alerts.map(a=>a.symbol).join(",");
   const data=await (await fetch(`/api/prices?symbols=${syms}`)).json();
-
   for(const a of alerts){
     if(a.triggered)continue;
     const d=data[a.symbol];
-    if(!d) continue;
-
-    if(d.price>=a.price){
-      await fetch("/api/alert",{
-        method:"POST",
-        headers:{"Content-Type":"application/json"},
-        body:JSON.stringify({
-          email:a.email,
-          symbol:a.symbol,
-          target:a.price,
-          price:d.price
-        })
-      });
-
-      await updateDoc(doc(db,"users",userId,"alerts",a.id),{
-        triggered:true,
-        triggeredAt: serverTimestamp()
-      });
-
+    if(d && d.price>=a.price){
+      await fetch("/api/alert",{method:"POST",headers:{"Content-Type":"application/json"},
+        body:JSON.stringify({email:a.email,symbol:a.symbol,target:a.price,price:d.price})});
+      await updateDoc(doc(db,"users",userId,"alerts",a.id),
+        {triggered:true,triggeredAt:serverTimestamp()});
       loadAlerts();
     }
   }
