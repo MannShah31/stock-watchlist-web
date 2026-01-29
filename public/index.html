@@ -52,12 +52,9 @@ button { background:#2563eb;color:white;border:none;border-radius:8px;padding:10
 .stock-card {
   background:white;border-radius:16px;padding:18px;
   box-shadow:0 10px 30px rgba(0,0,0,.08);
-  transition:.2s;
 }
-.stock-card:hover { transform:translateY(-4px) }
 .stock-title { font-weight:600;font-size:16px }
 .price { font-size:26px;font-weight:700;margin:6px 0 }
-.meta { display:grid;grid-template-columns:repeat(3,1fr);gap:8px;font-size:13px;color:#6b7280 }
 .green{color:#16a34a;font-weight:600}
 .red{color:#dc2626;font-weight:600}
 
@@ -81,7 +78,6 @@ button { background:#2563eb;color:white;border:none;border-radius:8px;padding:10
   background:#dc2626;
   border-radius:50%;
   width:32px;height:32px;
-  display:flex;align-items:center;justify-content:center;
 }
 </style>
 </head>
@@ -112,28 +108,26 @@ button { background:#2563eb;color:white;border:none;border-radius:8px;padding:10
 
 <div class="app-wrap">
 
-  <div id="watchTab">
-    <div class="search-card">
-      <input id="search" class="search-input" placeholder="Search stock...">
-      <div id="dropdown" class="dropdown"></div>
-    </div>
-    <div id="stockGrid" class="stock-grid"></div>
+<div id="watchTab">
+  <div class="search-card">
+    <input id="search" class="search-input" placeholder="Search stock...">
+    <div id="dropdown" class="dropdown"></div>
   </div>
+  <div id="stockGrid" class="stock-grid"></div>
+</div>
 
-  <div id="alertsTab" style="display:none">
-    <div class="alert-card">
-      <h3>🔔 Price Alerts</h3>
-
-      <div style="display:flex;gap:10px;margin-bottom:14px">
-        <select id="alertSymbol" style="flex:1;padding:10px;border-radius:8px"></select>
-        <input id="alertPrice" type="number" placeholder="Target Price"
-          style="flex:1;padding:10px;border-radius:8px;border:1px solid #ddd">
-        <button id="addAlertBtn" type="button">Add</button>
-      </div>
-
-      <div id="alertList"></div>
+<div id="alertsTab" style="display:none">
+  <div class="alert-card">
+    <h3>🔔 Price Alerts</h3>
+    <div style="display:flex;gap:10px;margin-bottom:14px">
+      <select id="alertSymbol" style="flex:1;padding:10px;border-radius:8px"></select>
+      <input id="alertPrice" type="number" placeholder="Target Price"
+        style="flex:1;padding:10px;border-radius:8px;border:1px solid #ddd">
+      <button id="addAlertBtn">Add</button>
     </div>
+    <div id="alertList"></div>
   </div>
+</div>
 
 </div>
 </div>
@@ -149,12 +143,32 @@ const app = initializeApp(firebaseConfig);
 const auth = getAuth(app);
 const db = getFirestore(app);
 
-let allStocks=[],watchlist=[],alerts=[],userId=null;
+/* DOM */
+const loginBtn = document.getElementById("loginBtn");
+const signupBtn = document.getElementById("signupBtn");
+const logoutBtn = document.getElementById("logoutBtn");
+const search = document.getElementById("search");
+const dropdown = document.getElementById("dropdown");
+const stockGrid = document.getElementById("stockGrid");
+const alertList = document.getElementById("alertList");
+const alertSymbol = document.getElementById("alertSymbol");
+const alertPrice = document.getElementById("alertPrice");
+const addAlertBtn = document.getElementById("addAlertBtn");
+const tabWatch = document.getElementById("tabWatch");
+const tabAlerts = document.getElementById("tabAlerts");
+const watchTab = document.getElementById("watchTab");
+const alertsTab = document.getElementById("alertsTab");
+const loginScreen = document.getElementById("loginScreen");
+const appScreen = document.getElementById("appScreen");
 
+let allStocks=[], watchlist=[], alerts=[], userId=null;
+
+/* AUTH */
 loginBtn.onclick=()=>signInWithEmailAndPassword(auth,email.value,password.value);
 signupBtn.onclick=()=>createUserWithEmailAndPassword(auth,email.value,password.value);
 logoutBtn.onclick=()=>signOut(auth);
 
+/* LOGIN */
 onAuthStateChanged(auth,async u=>{
   if(u){
     userId=u.uid;
@@ -169,38 +183,33 @@ onAuthStateChanged(auth,async u=>{
   }
 });
 
+/* TABS */
 tabWatch.onclick=()=>{watchTab.style.display="block";alertsTab.style.display="none";tabWatch.classList.add("active");tabAlerts.classList.remove("active")}
 tabAlerts.onclick=()=>{watchTab.style.display="none";alertsTab.style.display="block";tabAlerts.classList.add("active");tabWatch.classList.remove("active");populateAlertDropdown();renderAlerts()}
 
-function populateAlertDropdown(){
-  alertSymbol.innerHTML=`<option value="">Select stock</option>`;
-  watchlist.forEach(s=>{
-    const o=document.createElement("option");
-    o.value=s.symbol;o.textContent=`${s.name} (${s.symbol})`;
-    alertSymbol.appendChild(o);
-  });
-}
-
+/* SEARCH */
 search.addEventListener("input",e=>{
   const q=e.target.value.toLowerCase();
   dropdown.innerHTML="";
   if(!q)return;
-  allStocks.filter(s=>s.name.toLowerCase().includes(q)||s.symbol.toLowerCase().includes(q)).slice(0,10).forEach(s=>{
-    const d=document.createElement("div");
-    d.className="option";
-    d.textContent=`${s.name} (${s.symbol})`;
-    d.onclick=()=>addStock(s);
-    dropdown.appendChild(d);
-  });
+  allStocks.filter(s=>s.name.toLowerCase().includes(q)||s.symbol.toLowerCase().includes(q))
+    .slice(0,10).forEach(s=>{
+      const d=document.createElement("div");
+      d.className="option";
+      d.textContent=`${s.name} (${s.symbol})`;
+      d.onclick=()=>addStock(s);
+      dropdown.appendChild(d);
+    });
 });
 
+/* WATCHLIST */
 function addStock(s){
   if(watchlist.find(x=>x.symbol===s.symbol))return;
   watchlist.push(s);
   dropdown.innerHTML="";search.value="";
   render();
 }
-window.addStock=addStock;
+window.removeStock=symbol=>{watchlist=watchlist.filter(s=>s.symbol!==symbol);render();}
 
 async function render(){
   if(!watchlist.length)return;
@@ -212,12 +221,29 @@ async function render(){
     const div=document.createElement("div");
     div.className="stock-card";
     div.innerHTML=`<div style="display:flex;justify-content:space-between"><div class="stock-title">${s.name}</div><button onclick="removeStock('${s.symbol}')">✕</button></div>
-    <div class="price">₹${d.price.toFixed(2)}</div><div class="${d.change>=0?'green':'red'}">${d.changePercent.toFixed(2)}%</div>`;
+    <div class="price">₹${d.price.toFixed(2)}</div>`;
     stockGrid.appendChild(div);
   });
 }
 
-window.removeStock=symbol=>{watchlist=watchlist.filter(s=>s.symbol!==symbol);render();}
+/* ALERTS */
+function populateAlertDropdown(){
+  alertSymbol.innerHTML=`<option value="">Select stock</option>`;
+  watchlist.forEach(s=>{
+    const o=document.createElement("option");
+    o.value=s.symbol;o.textContent=`${s.name} (${s.symbol})`;
+    alertSymbol.appendChild(o);
+  });
+}
+
+addAlertBtn.addEventListener("click", async ()=>{
+  const s=alertSymbol.value;
+  const p=Number(alertPrice.value);
+  if(!s||!p)return alert("Select stock & price");
+  await addDoc(collection(db,"users",userId,"alerts"),{symbol:s,price:p,triggered:false,email:auth.currentUser.email});
+  alertPrice.value="";
+  loadAlerts();
+});
 
 async function loadAlerts(){
   alerts=[];
@@ -225,17 +251,6 @@ async function loadAlerts(){
   snap.forEach(d=>alerts.push({id:d.id,...d.data()}));
   renderAlerts();
 }
-
-addAlertBtn.addEventListener("click",addAlert);
-async function addAlert(){
-  const s=alertSymbol.value;
-  const p=Number(alertPrice.value);
-  if(!s||!p)return alert("Select stock & price");
-  await addDoc(collection(db,"users",userId,"alerts"),{symbol:s,price:p,triggered:false,email:auth.currentUser.email});
-  alertPrice.value="";
-  loadAlerts();
-}
-window.addAlert=addAlert;
 
 function renderAlerts(){
   alertList.innerHTML="";
@@ -268,5 +283,6 @@ async function checkAlerts(){
   }
 }
 </script>
+
 </body>
 </html>
