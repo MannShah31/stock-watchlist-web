@@ -22,33 +22,31 @@ const mailer = nodemailer.createTransport({
   }
 });
 
-// --------------------
-// In-memory alerts (server runtime)
-// --------------------
-let activeAlerts = [];
-
-// --------------------
-// Health check
-// --------------------
-app.get("/api/health", (req, res) => {
-  res.json({ status: "ok" });
+// verify on startup
+mailer.verify(err => {
+  if (err) console.error("❌ Mailer error:", err);
+  else console.log("✅ Mail server ready");
 });
 
 // --------------------
-// Helper: fetch single stock safely
+// Health
+// --------------------
+app.get("/api/health", (_, res) => res.json({ status: "ok" }));
+
+// --------------------
+// Yahoo fetch
 // --------------------
 function fetchSingleStock(symbol) {
   return new Promise(resolve => {
-    const safeSymbol = encodeURIComponent(symbol.trim());
-    const url = `https://query1.finance.yahoo.com/v8/finance/chart/${safeSymbol}?interval=1m&range=1d`;
+    const safe = encodeURIComponent(symbol.trim());
+    const url = `https://query1.finance.yahoo.com/v8/finance/chart/${safe}?interval=1m&range=1d`;
 
-    https.get(url, { headers: { "User-Agent": "Mozilla/5.0" } }, response => {
+    https.get(url, { headers: { "User-Agent": "Mozilla/5.0" } }, r => {
       let raw = "";
-      response.on("data", d => (raw += d));
-      response.on("end", () => {
+      r.on("data", d => (raw += d));
+      r.on("end", () => {
         try {
-          const json = JSON.parse(raw);
-          const meta = json.chart?.result?.[0]?.meta;
+          const meta = JSON.parse(raw).chart?.result?.[0]?.meta;
           if (!meta) return resolve(null);
 
           resolve({
@@ -73,108 +71,42 @@ function fetchSingleStock(symbol) {
 }
 
 // --------------------
-// Send email
+// SEND MAIL ONLY
 // --------------------
-async function sendAlertEmail(to, symbol, target, price) {
-  try {
-    await mailer.sendMail({
-      from: process.env.EMAIL_FROM,
-      to,
-      subject: `🚨 Stock Alert: ${symbol} crossed ₹${target}`,
-      html: `
-        <h2>Stock Alert</h2>
-        <p><b>${symbol}</b> crossed your target price.</p>
-        <p>Target: ₹${target}</p>
-        <p>Current: ₹${price}</p>
-        <p>— Stock Watchlist App</p>
-      `
-    });
-    console.log("📧 Alert email sent to", to);
-  } catch (e) {
-    console.error("Email failed:", e.message);
-  }
-}
+app.post("/api/alert", async (req, res) => {
+  const { email, symbol, target, price } = req.body;
 
-// --------------------
-// Register alert from frontend
-// --------------------
-app.post("/api/alert", (req, res) => {
-  const { email, symbol, target } = req.body;
-  if (!email || !symbol || !target) {
+  if (!email || !symbol || !target || !price) {
     return res.status(400).json({ error: "Missing fields" });
   }
 
-  activeAlerts.push({
-    email,
-    symbol,
-    target: Number(target),
-    triggered: false
-  });
+  try {
+    await mailer.sendMail({
+      from: `"Stock Watchlist" <${process.env.EMAIL_USER}>`,
+      to: email,
+      subject: `🚨 ${symbol} crossed ₹${target}`,
+      html: `
+        <h2>Stock Alert Triggered</h2>
+        <p><b>${symbol}</b> crossed your target.</p>
+        <p>Target: ₹${target}</p>
+        <p>Current: ₹${price}</p>
+      `
+    });
 
-  console.log("📝 Alert added:", symbol, target);
-  res.json({ ok: true });
-});
-
-// --------------------
-// Auto alert checker (every 60s)
-// --------------------
-async function checkAlerts() {
-  if (!activeAlerts.length) return;
-
-  const symbols = [...new Set(activeAlerts.map(a => a.symbol))].join(",");
-  if (!symbols) return;
-
-  const prices = await new Promise(resolve => {
-    https.get(
-      `https://stock-watchlist-web.onrender.com/api/prices?symbols=${symbols}`,
-      res => {
-        let raw = "";
-        res.on("data", d => (raw += d));
-        res.on("end", () => {
-          try {
-            resolve(JSON.parse(raw));
-          } catch {
-            resolve(null);
-          }
-        });
-      }
-    ).on("error", () => resolve(null));
-  });
-
-  if (!prices) return;
-
-  for (const alert of activeAlerts) {
-    if (alert.triggered) continue;
-
-    const stock = prices[alert.symbol];
-    if (!stock) continue;
-
-    if (stock.price >= alert.target) {
-      alert.triggered = true;
-      await sendAlertEmail(
-        alert.email,
-        alert.symbol,
-        alert.target,
-        stock.price
-      );
-      console.log("🚨 ALERT FIRED:", alert.symbol);
-    }
+    console.log("📧 MAIL SENT →", email);
+    res.json({ ok: true });
+  } catch (err) {
+    console.error("❌ MAIL FAILED:", err);
+    res.status(500).json({ error: "Mail failed" });
   }
-}
-
-// Run every 60 seconds
-setInterval(checkAlerts, 60 * 1000);
+});
 
 // --------------------
 // APIs
 // --------------------
 app.get("/api/stock", async (req, res) => {
-  const symbol = req.query.symbol;
-  if (!symbol) return res.status(400).json({ error: "Missing symbol" });
-
-  const data = await fetchSingleStock(symbol);
-  if (!data) return res.status(404).json({ error: "No data" });
-  res.json(data);
+  const data = await fetchSingleStock(req.query.symbol);
+  data ? res.json(data) : res.status(404).json({ error: "No data" });
 });
 
 app.get("/api/prices", async (req, res) => {
@@ -182,35 +114,26 @@ app.get("/api/prices", async (req, res) => {
   if (!symbols) return res.status(400).json({ error: "Missing symbols" });
 
   symbols = symbols.split(",").map(s => s.trim()).filter(Boolean);
-  if (!symbols.length) return res.status(400).json({ error: "No valid symbols" });
-
-  const MAX_PARALLEL = 5;
   const results = {};
 
-  for (let i = 0; i < symbols.length; i += MAX_PARALLEL) {
-    const chunk = symbols.slice(i, i + MAX_PARALLEL);
+  for (let i = 0; i < symbols.length; i += 5) {
+    const chunk = symbols.slice(i, i + 5);
     const data = await Promise.all(chunk.map(fetchSingleStock));
-    data.forEach(d => {
-      if (d && d.symbol) results[d.symbol] = d;
-    });
+    data.forEach(d => d && (results[d.symbol] = d));
   }
 
   res.json(results);
 });
 
 app.get("/api/stocks", (req, res) => {
-  try {
-    const data = fs.readFileSync(path.join(__dirname, "stocks.json"), "utf-8");
-    res.json(JSON.parse(data));
-  } catch {
-    res.status(500).json({ error: "Stock list failed" });
-  }
+  const file = path.join(__dirname, "stocks.json");
+  res.json(JSON.parse(fs.readFileSync(file, "utf8")));
 });
 
-app.get("/api/version", (req, res) => {
-  res.json({ version: "fan-out-v1 + mailer + auto-alerts" });
+app.get("/api/version", (_, res) => {
+  res.json({ version: "fan-out-v1 + mailer + frontend-triggers" });
 });
 
 app.listen(PORT, HOST, () => {
-  console.log(`Server running on ${HOST}:${PORT}`);
+  console.log(`🚀 Server running on ${HOST}:${PORT}`);
 });
