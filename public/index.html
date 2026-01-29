@@ -6,79 +6,29 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 
 <style>
-body { margin:0;font-family:Inter,Arial,sans-serif;background:#f4f6fb; }
-header {
-  background:linear-gradient(90deg,#2563eb,#1d4ed8);
-  color:white;padding:18px 32px;
-  display:flex;justify-content:space-between;align-items:center;
-}
-nav button {
-  background:none;border:none;color:white;
-  font-size:15px;margin-right:16px;cursor:pointer;opacity:.8
-}
-nav button.active { font-weight:600;opacity:1;border-bottom:2px solid #fff }
-button { background:#2563eb;color:white;border:none;border-radius:8px;padding:10px 14px;cursor:pointer }
-
-.login-wrap { height:100vh;display:flex;justify-content:center;align-items:center }
-.login-card {
-  width:340px;background:white;padding:30px;border-radius:16px;
-  box-shadow:0 20px 40px rgba(0,0,0,.15)
-}
-.login-card input { width:100%;padding:12px;margin-bottom:12px;border-radius:8px;border:1px solid #ddd }
-
-.app-wrap { max-width:1200px;margin:auto;padding:30px }
-.search-card {
-  background:white;border-radius:16px;padding:18px;
-  box-shadow:0 12px 30px rgba(0,0,0,.08);
-  position:relative;
-}
-.search-input { width:100%;padding:14px;border-radius:10px;border:1px solid #e5e7eb;font-size:15px }
-
-.dropdown {
-  position:absolute;left:18px;right:18px;top:68px;
-  background:white;border:1px solid #ddd;border-radius:10px;
-  max-height:240px;overflow-y:auto;z-index:999;
-  box-shadow:0 8px 20px rgba(0,0,0,.12)
-}
-.option { padding:10px 14px;cursor:pointer;font-size:14px }
-.option:hover { background:#f1f5f9 }
-
-.stock-grid {
-  margin-top:24px;
-  display:grid;
-  grid-template-columns:repeat(auto-fill,minmax(320px,1fr));
-  gap:20px;
-}
-.stock-card {
-  background:white;border-radius:16px;padding:18px;
-  box-shadow:0 10px 30px rgba(0,0,0,.08);
-}
-.stock-title { font-weight:600;font-size:16px }
-.price { font-size:26px;font-weight:700;margin:6px 0 }
+body{margin:0;font-family:Inter,Arial,sans-serif;background:#f4f6fb}
+header{background:linear-gradient(90deg,#2563eb,#1d4ed8);color:#fff;padding:18px 32px;display:flex;justify-content:space-between;align-items:center}
+nav button{background:none;border:none;color:white;font-size:15px;margin-right:16px;cursor:pointer;opacity:.8}
+nav button.active{font-weight:600;opacity:1;border-bottom:2px solid #fff}
+button{background:#2563eb;color:white;border:none;border-radius:8px;padding:10px 14px;cursor:pointer}
+.login-wrap{height:100vh;display:flex;justify-content:center;align-items:center}
+.login-card{width:340px;background:white;padding:30px;border-radius:16px;box-shadow:0 20px 40px rgba(0,0,0,.15)}
+.login-card input{width:100%;padding:12px;margin-bottom:12px;border-radius:8px;border:1px solid #ddd}
+.app-wrap{max-width:1200px;margin:auto;padding:30px}
+.search-card{background:white;border-radius:16px;padding:18px;box-shadow:0 12px 30px rgba(0,0,0,.08);position:relative}
+.search-input{width:100%;padding:14px;border-radius:10px;border:1px solid #e5e7eb;font-size:15px}
+.dropdown{position:absolute;left:18px;right:18px;top:68px;background:white;border:1px solid #ddd;border-radius:10px;max-height:240px;overflow-y:auto;z-index:999}
+.option{padding:10px 14px;cursor:pointer;font-size:14px}
+.option:hover{background:#f1f5f9}
+.stock-grid{margin-top:24px;display:grid;grid-template-columns:repeat(auto-fill,minmax(320px,1fr));gap:20px}
+.stock-card{background:white;border-radius:16px;padding:18px;box-shadow:0 10px 30px rgba(0,0,0,.08)}
+.stock-title{font-weight:600;font-size:16px}
+.price{font-size:26px;font-weight:700;margin:6px 0}
 .green{color:#16a34a;font-weight:600}
 .red{color:#dc2626;font-weight:600}
-
-.alert-card {
-  background:white;padding:22px;border-radius:18px;
-  box-shadow:0 10px 30px rgba(0,0,0,.08);margin-top:20px
-}
-.alert-row {
-  display:flex;justify-content:space-between;align-items:center;
-  border-bottom:1px solid #eee;padding:12px 0
-}
-.alert-chip{
-  background:#eef2ff;
-  color:#1d4ed8;
-  padding:6px 14px;
-  border-radius:999px;
-  font-weight:600;
-  font-size:13px;
-}
-.alert-row button{
-  background:#dc2626;
-  border-radius:50%;
-  width:32px;height:32px;
-}
+.alert-card{background:white;padding:22px;border-radius:18px;box-shadow:0 10px 30px rgba(0,0,0,.08)}
+.alert-row{display:flex;justify-content:space-between;align-items:center;border-bottom:1px solid #eee;padding:12px 0}
+.alert-chip{background:#eef2ff;color:#1d4ed8;padding:6px 14px;border-radius:999px;font-weight:600;font-size:13px}
 </style>
 </head>
 
@@ -121,8 +71,7 @@ button { background:#2563eb;color:white;border:none;border-radius:8px;padding:10
     <h3>🔔 Price Alerts</h3>
     <div style="display:flex;gap:10px;margin-bottom:14px">
       <select id="alertSymbol" style="flex:1;padding:10px;border-radius:8px"></select>
-      <input id="alertPrice" type="number" placeholder="Target Price"
-        style="flex:1;padding:10px;border-radius:8px;border:1px solid #ddd">
+      <input id="alertPrice" type="number" placeholder="Target Price" style="flex:1;padding:10px;border-radius:8px;border:1px solid #ddd">
       <button id="addAlertBtn">Add</button>
     </div>
     <div id="alertList"></div>
@@ -135,81 +84,70 @@ button { background:#2563eb;color:white;border:none;border-radius:8px;padding:10
 <script type="module">
 import { initializeApp } from "https://www.gstatic.com/firebasejs/12.8.0/firebase-app.js";
 import { getAuth, signInWithEmailAndPassword, createUserWithEmailAndPassword, onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/12.8.0/firebase-auth.js";
-import { getFirestore, collection, addDoc, getDocs, deleteDoc, doc, updateDoc } from "https://www.gstatic.com/firebasejs/12.8.0/firebase-firestore.js";
+import { getFirestore, doc, setDoc, getDoc, collection, addDoc, getDocs, deleteDoc, updateDoc } from "https://www.gstatic.com/firebasejs/12.8.0/firebase-firestore.js";
 
-const firebaseConfig = { apiKey:"AIzaSyCd2vJNlGVh9q1GWT2M_GepSKolo-t2Sr4",authDomain:"stock-watchlist-app-1eced.firebaseapp.com",projectId:"stock-watchlist-app-1eced",storageBucket:"stock-watchlist-app-1eced.firebasestorage.app",messagingSenderId:"99623824439",appId:"1:99623824439:web:21b9546b0ceee31ba623b2" };
+const firebaseConfig = {
+  apiKey:"AIzaSyCd2vJNlGVh9q1GWT2M_GepSKolo-t2Sr4",
+  authDomain:"stock-watchlist-app-1eced.firebaseapp.com",
+  projectId:"stock-watchlist-app-1eced",
+  storageBucket:"stock-watchlist-app-1eced.firebasestorage.app",
+  messagingSenderId:"99623824439",
+  appId:"1:99623824439:web:21b9546b0ceee31ba623b2"
+};
 
 const app = initializeApp(firebaseConfig);
 const auth = getAuth(app);
 const db = getFirestore(app);
 
-/* DOM */
-const loginBtn = document.getElementById("loginBtn");
-const signupBtn = document.getElementById("signupBtn");
-const logoutBtn = document.getElementById("logoutBtn");
-const search = document.getElementById("search");
-const dropdown = document.getElementById("dropdown");
-const stockGrid = document.getElementById("stockGrid");
-const alertList = document.getElementById("alertList");
-const alertSymbol = document.getElementById("alertSymbol");
-const alertPrice = document.getElementById("alertPrice");
-const addAlertBtn = document.getElementById("addAlertBtn");
-const tabWatch = document.getElementById("tabWatch");
-const tabAlerts = document.getElementById("tabAlerts");
-const watchTab = document.getElementById("watchTab");
-const alertsTab = document.getElementById("alertsTab");
-const loginScreen = document.getElementById("loginScreen");
-const appScreen = document.getElementById("appScreen");
-
 let allStocks=[], watchlist=[], alerts=[], userId=null;
 
-/* AUTH */
 loginBtn.onclick=()=>signInWithEmailAndPassword(auth,email.value,password.value);
 signupBtn.onclick=()=>createUserWithEmailAndPassword(auth,email.value,password.value);
 logoutBtn.onclick=()=>signOut(auth);
 
-/* LOGIN */
 onAuthStateChanged(auth,async u=>{
   if(u){
     userId=u.uid;
     loginScreen.style.display="none";
     appScreen.style.display="block";
     allStocks=await (await fetch("/api/stocks")).json();
+
+    const snap = await getDoc(doc(db,"users",userId));
+    if(snap.exists() && snap.data().watchlist){
+      watchlist = snap.data().watchlist;
+      render();
+    }
+
     loadAlerts();
     setInterval(checkAlerts,30000);
-  }else{
+  } else {
     loginScreen.style.display="flex";
     appScreen.style.display="none";
   }
 });
 
-/* TABS */
 tabWatch.onclick=()=>{watchTab.style.display="block";alertsTab.style.display="none";tabWatch.classList.add("active");tabAlerts.classList.remove("active")}
 tabAlerts.onclick=()=>{watchTab.style.display="none";alertsTab.style.display="block";tabAlerts.classList.add("active");tabWatch.classList.remove("active");populateAlertDropdown();renderAlerts()}
 
-/* SEARCH */
 search.addEventListener("input",e=>{
   const q=e.target.value.toLowerCase();
   dropdown.innerHTML="";
   if(!q)return;
-  allStocks.filter(s=>s.name.toLowerCase().includes(q)||s.symbol.toLowerCase().includes(q))
-    .slice(0,10).forEach(s=>{
-      const d=document.createElement("div");
-      d.className="option";
-      d.textContent=`${s.name} (${s.symbol})`;
-      d.onclick=()=>addStock(s);
-      dropdown.appendChild(d);
-    });
+  allStocks.filter(s=>s.name.toLowerCase().includes(q)||s.symbol.toLowerCase().includes(q)).slice(0,10).forEach(s=>{
+    const d=document.createElement("div");
+    d.className="option";
+    d.textContent=`${s.name} (${s.symbol})`;
+    d.onclick=()=>addStock(s);
+    dropdown.appendChild(d);
+  });
 });
 
-/* WATCHLIST */
-function addStock(s){
+async function addStock(s){
   if(watchlist.find(x=>x.symbol===s.symbol))return;
   watchlist.push(s);
-  dropdown.innerHTML="";search.value="";
+  await setDoc(doc(db,"users",userId),{watchlist},{merge:true});
   render();
 }
-window.removeStock=symbol=>{watchlist=watchlist.filter(s=>s.symbol!==symbol);render();}
 
 async function render(){
   if(!watchlist.length)return;
@@ -217,33 +155,35 @@ async function render(){
   const data=await (await fetch(`/api/prices?symbols=${syms}`)).json();
   stockGrid.innerHTML="";
   watchlist.forEach(s=>{
-    const d=data[s.symbol]; if(!d)return;
+    const d=data[s.symbol];
+    if(!d)return;
     const div=document.createElement("div");
     div.className="stock-card";
-    div.innerHTML=`<div style="display:flex;justify-content:space-between"><div class="stock-title">${s.name}</div><button onclick="removeStock('${s.symbol}')">✕</button></div>
-    <div class="price">₹${d.price.toFixed(2)}</div>`;
+    div.innerHTML=`<div class="stock-title">${s.name}</div>
+    <div class="price">₹${d.price.toFixed(2)}</div>
+    <div class="${d.change>=0?'green':'red'}">${d.changePercent.toFixed(2)}%</div>`;
     stockGrid.appendChild(div);
   });
 }
 
-/* ALERTS */
 function populateAlertDropdown(){
-  alertSymbol.innerHTML=`<option value="">Select stock</option>`;
+  alertSymbol.innerHTML="";
   watchlist.forEach(s=>{
     const o=document.createElement("option");
-    o.value=s.symbol;o.textContent=`${s.name} (${s.symbol})`;
+    o.value=s.symbol;
+    o.textContent=`${s.name} (${s.symbol})`;
     alertSymbol.appendChild(o);
   });
 }
 
-addAlertBtn.addEventListener("click", async ()=>{
+addAlertBtn.onclick=async ()=>{
   const s=alertSymbol.value;
   const p=Number(alertPrice.value);
   if(!s||!p)return alert("Select stock & price");
   await addDoc(collection(db,"users",userId,"alerts"),{symbol:s,price:p,triggered:false,email:auth.currentUser.email});
   alertPrice.value="";
   loadAlerts();
-});
+};
 
 async function loadAlerts(){
   alerts=[];
@@ -257,7 +197,9 @@ function renderAlerts(){
   alerts.forEach(a=>{
     const div=document.createElement("div");
     div.className="alert-row";
-    div.innerHTML=`<span class="alert-chip">${a.symbol}</span><span>₹${a.price}</span><button>✕</button>`;
+    div.innerHTML=`<span class="alert-chip">${a.symbol}</span>
+    <span>₹${a.price}</span>
+    <button>✕</button>`;
     div.querySelector("button").onclick=()=>deleteAlert(a.id);
     alertList.appendChild(div);
   });
@@ -283,6 +225,5 @@ async function checkAlerts(){
   }
 }
 </script>
-
 </body>
 </html>
