@@ -148,20 +148,34 @@ window.removeStock=async sym=>{
 
 async function render(){
   if(!watchlist.length){stockGrid.innerHTML="";return;}
-  const syms=watchlist.map(s=>s.symbol).join(",");
-  const data=await (await fetch(`/api/prices?symbols=${syms}`)).json();
+
+  const syms = watchlist.map(s=>s.symbol).join(",");
+  const data = await (await fetch(`/api/prices?symbols=${syms}`)).json();
+
   stockGrid.innerHTML="";
   watchlist.forEach(s=>{
-    const d=data[s.symbol]; if(!d)return;
-    const div=document.createElement("div");
+    const d = data[s.symbol];
+    if(!d) return;
+
+    const div = document.createElement("div");
     div.className="stock-card";
     div.innerHTML=`
       <div style="display:flex;justify-content:space-between">
         <span class="stock-title">${s.name}</span>
         <button onclick="removeStock('${s.symbol}')">✕</button>
       </div>
+
       <div class="price">₹${d.price.toFixed(2)}</div>
-      <div class="${d.change>=0?'green':'red'}">${d.changePercent.toFixed(2)}%</div>`;
+      <div class="${d.change>=0?'green':'red'}">
+        ${d.changePercent.toFixed(2)}%
+      </div>
+
+      <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:8px;font-size:13px;color:#6b7280">
+        <div>52W H<br><b>${d.high52}</b></div>
+        <div>52W L<br><b>${d.low52}</b></div>
+        <div>Vol<br><b>${d.volume.toLocaleString()}</b></div>
+      </div>
+    `;
     stockGrid.appendChild(div);
   });
 }
