@@ -23,6 +23,11 @@ const mailer = nodemailer.createTransport({
 });
 
 // --------------------
+// In-memory alerts (server runtime)
+// --------------------
+let activeAlerts = [];
+
+// --------------------
 // Health check
 // --------------------
 app.get("/api/health", (req, res) => {
@@ -84,27 +89,84 @@ async function sendAlertEmail(to, symbol, target, price) {
         <p>— Stock Watchlist App</p>
       `
     });
-    console.log("Alert email sent to", to);
+    console.log("📧 Alert email sent to", to);
   } catch (e) {
     console.error("Email failed:", e.message);
   }
 }
 
 // --------------------
-// Trigger alert email
+// Register alert from frontend
 // --------------------
-app.post("/api/alert", async (req, res) => {
-  const { email, symbol, target, price } = req.body;
-  if (!email || !symbol || !target || !price) {
+app.post("/api/alert", (req, res) => {
+  const { email, symbol, target } = req.body;
+  if (!email || !symbol || !target) {
     return res.status(400).json({ error: "Missing fields" });
   }
 
-  await sendAlertEmail(email, symbol, target, price);
+  activeAlerts.push({
+    email,
+    symbol,
+    target: Number(target),
+    triggered: false
+  });
+
+  console.log("📝 Alert added:", symbol, target);
   res.json({ ok: true });
 });
 
 // --------------------
-// Single stock
+// Auto alert checker (every 60s)
+// --------------------
+async function checkAlerts() {
+  if (!activeAlerts.length) return;
+
+  const symbols = [...new Set(activeAlerts.map(a => a.symbol))].join(",");
+  if (!symbols) return;
+
+  const prices = await new Promise(resolve => {
+    https.get(
+      `https://stock-watchlist-web.onrender.com/api/prices?symbols=${symbols}`,
+      res => {
+        let raw = "";
+        res.on("data", d => (raw += d));
+        res.on("end", () => {
+          try {
+            resolve(JSON.parse(raw));
+          } catch {
+            resolve(null);
+          }
+        });
+      }
+    ).on("error", () => resolve(null));
+  });
+
+  if (!prices) return;
+
+  for (const alert of activeAlerts) {
+    if (alert.triggered) continue;
+
+    const stock = prices[alert.symbol];
+    if (!stock) continue;
+
+    if (stock.price >= alert.target) {
+      alert.triggered = true;
+      await sendAlertEmail(
+        alert.email,
+        alert.symbol,
+        alert.target,
+        stock.price
+      );
+      console.log("🚨 ALERT FIRED:", alert.symbol);
+    }
+  }
+}
+
+// Run every 60 seconds
+setInterval(checkAlerts, 60 * 1000);
+
+// --------------------
+// APIs
 // --------------------
 app.get("/api/stock", async (req, res) => {
   const symbol = req.query.symbol;
@@ -115,9 +177,6 @@ app.get("/api/stock", async (req, res) => {
   res.json(data);
 });
 
-// --------------------
-// Batch prices
-// --------------------
 app.get("/api/prices", async (req, res) => {
   let symbols = req.query.symbols;
   if (!symbols) return res.status(400).json({ error: "Missing symbols" });
@@ -139,9 +198,6 @@ app.get("/api/prices", async (req, res) => {
   res.json(results);
 });
 
-// --------------------
-// Stock master list
-// --------------------
 app.get("/api/stocks", (req, res) => {
   try {
     const data = fs.readFileSync(path.join(__dirname, "stocks.json"), "utf-8");
@@ -151,9 +207,8 @@ app.get("/api/stocks", (req, res) => {
   }
 });
 
-// --------------------
 app.get("/api/version", (req, res) => {
-  res.json({ version: "fan-out-v1 + mailer" });
+  res.json({ version: "fan-out-v1 + mailer + auto-alerts" });
 });
 
 app.listen(PORT, HOST, () => {
