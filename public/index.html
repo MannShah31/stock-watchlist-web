@@ -170,10 +170,12 @@ let watchlist = [];
 let alerts = [];
 let userId = null;
 
+/* AUTH */
 loginBtn.onclick=()=>signInWithEmailAndPassword(auth,email.value,password.value).catch(e=>alert(e.message));
 signupBtn.onclick=()=>createUserWithEmailAndPassword(auth,email.value,password.value).catch(e=>alert(e.message));
 logoutBtn.onclick=()=>signOut(auth);
 
+/* LOGIN */
 onAuthStateChanged(auth,async u=>{
   if(u){
     userId = u.uid;
@@ -188,25 +190,102 @@ onAuthStateChanged(auth,async u=>{
   }
 });
 
+/* TABS */
+tabWatch.onclick=()=>{
+  watchTab.style.display="block";
+  alertsTab.style.display="none";
+  tabWatch.classList.add("active");
+  tabAlerts.classList.remove("active");
+};
+
+tabAlerts.onclick=()=>{
+  watchTab.style.display="none";
+  alertsTab.style.display="block";
+  tabAlerts.classList.add("active");
+  tabWatch.classList.remove("active");
+
+  alertSymbol.innerHTML=`<option value="">Select stock</option>`;
+  watchlist.forEach(s=>{
+    const o=document.createElement("option");
+    o.value=s.symbol;
+    o.textContent=`${s.name} (${s.symbol})`;
+    alertSymbol.appendChild(o);
+  });
+  renderAlerts();
+};
+
+/* SEARCH */
+search.addEventListener("input",e=>{
+  const q=e.target.value.toLowerCase();
+  dropdown.innerHTML="";
+  if(!q)return;
+  allStocks.filter(s=>s.name.toLowerCase().includes(q)||s.symbol.toLowerCase().includes(q))
+    .slice(0,10).forEach(s=>{
+      const d=document.createElement("div");
+      d.className="option";
+      d.textContent=`${s.name} (${s.symbol})`;
+      d.onclick=()=>addStock(s);
+      dropdown.appendChild(d);
+    });
+});
+
+/* WATCHLIST */
+function addStock(s){
+  if(watchlist.find(x=>x.symbol===s.symbol))return;
+  watchlist.push(s);
+  dropdown.innerHTML="";search.value="";
+  render();
+}
+
+async function render(){
+  if(!watchlist.length)return;
+  const syms=watchlist.map(s=>s.symbol).join(",");
+  const data = await (await fetch(`/api/prices?symbols=${syms}`)).json();
+  stockGrid.innerHTML="";
+  watchlist.forEach(s=>{
+    const d=data[s.symbol]; if(!d)return;
+    const div=document.createElement("div");
+    div.className="stock-card";
+    div.innerHTML=`
+      <div style="display:flex;justify-content:space-between">
+        <div class="stock-title">${s.name}</div>
+        <button onclick="removeStock('${s.symbol}')">✕</button>
+      </div>
+      <div class="price">₹${d.price.toFixed(2)}</div>
+      <div class="${d.change>=0?'green':'red'}">${d.changePercent.toFixed(2)}%</div>
+      <div class="meta">
+        <div>52W H<br><b>${d.high52}</b></div>
+        <div>52W L<br><b>${d.low52}</b></div>
+        <div>Vol<br><b>${d.volume.toLocaleString()}</b></div>
+      </div>`;
+    stockGrid.appendChild(div);
+  });
+}
+
+window.removeStock = symbol=>{
+  watchlist = watchlist.filter(s=>s.symbol!==symbol);
+  render();
+};
+
+/* ALERTS */
 async function loadAlerts(){
-  alerts = [];
-  const snap = await getDocs(collection(db,"users",userId,"alerts"));
+  alerts=[];
+  const snap=await getDocs(collection(db,"users",userId,"alerts"));
   snap.forEach(d=>alerts.push({id:d.id,...d.data()}));
   renderAlerts();
 }
 
-async function addAlert(){
-  const s = alertSymbol.value;
-  const p = Number(alertPrice.value);
-  if(!s||!p) return alert("Select stock & price");
+addAlertBtn.onclick=async ()=>{
+  const s=alertSymbol.value;
+  const p=Number(alertPrice.value);
+  if(!s||!p)return alert("Select stock & price");
 
   await addDoc(collection(db,"users",userId,"alerts"),{
     symbol:s,price:p,triggered:false,email:auth.currentUser.email
   });
   alertPrice.value="";
   loadAlerts();
-}
-addAlertBtn.onclick = addAlert;
+};
 
 function renderAlerts(){
   alertList.innerHTML="";
@@ -226,22 +305,21 @@ async function deleteAlert(id){
   loadAlerts();
 }
 
-/* 🔥 AUTO CHECK */
+/* AUTO CHECK */
 async function checkAlerts(){
-  if(!alerts.length) return;
-
-  const syms = alerts.map(a=>a.symbol).join(",");
-  const data = await (await fetch(`/api/prices?symbols=${syms}`)).json();
+  if(!alerts.length)return;
+  const syms=alerts.map(a=>a.symbol).join(",");
+  const data=await (await fetch(`/api/prices?symbols=${syms}`)).json();
 
   for(const a of alerts){
-    if(a.triggered) continue;
-    const d = data[a.symbol];
-    if(!d) continue;
+    if(a.triggered)continue;
+    const d=data[a.symbol];
+    if(!d)continue;
 
-    if(d.price >= a.price){
+    if(d.price>=a.price){
       await fetch("/api/alert",{
         method:"POST",
-        headers:{ "Content-Type":"application/json" },
+        headers:{"Content-Type":"application/json"},
         body:JSON.stringify({
           email:a.email,
           symbol:a.symbol,
