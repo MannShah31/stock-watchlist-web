@@ -5,6 +5,7 @@
 <title>Stock Watchlist</title>
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 
+<!-- Firebase -->
 <script type="module">
 import { initializeApp } from "https://www.gstatic.com/firebasejs/12.8.0/firebase-app.js";
 import {
@@ -50,8 +51,10 @@ window.addEventListener("DOMContentLoaded", () => {
     if (user) {
       loginScreen.style.display = "none";
       appScreen.style.display = "block";
+
       const r = await fetch("/api/stocks");
       allStocks = await r.json();
+      console.log("Stocks loaded:", allStocks.length);
     } else {
       loginScreen.style.display = "flex";
       appScreen.style.display = "none";
@@ -61,26 +64,47 @@ window.addEventListener("DOMContentLoaded", () => {
 </script>
 
 <style>
-body { margin:0; font-family: Inter, Arial, sans-serif; background:#f4f6fb; }
+body { margin:0;font-family:Inter,Arial,sans-serif;background:#f4f6fb; }
 header {
-  background: linear-gradient(90deg,#2563eb,#1d4ed8);
-  color:white; padding:18px 32px;
-  display:flex; justify-content:space-between; align-items:center;
+  background:linear-gradient(90deg,#2563eb,#1d4ed8);
+  color:white;padding:18px 32px;
+  display:flex;justify-content:space-between;align-items:center;
 }
 button { background:#2563eb;color:white;border:none;border-radius:8px;padding:10px 14px;cursor:pointer }
-.login-wrap { height:100vh; display:flex; justify-content:center; align-items:center; }
+.login-wrap { height:100vh;display:flex;justify-content:center;align-items:center }
 .login-card {
-  width:320px;background:white;padding:28px;border-radius:14px;
-  box-shadow:0 20px 40px rgba(0,0,0,0.12);
+  width:340px;background:white;padding:30px;border-radius:16px;
+  box-shadow:0 20px 40px rgba(0,0,0,.15)
 }
-.login-card input { width:100%;padding:12px;margin-bottom:10px;border-radius:8px;border:1px solid #ddd }
+.login-card input { width:100%;padding:12px;margin-bottom:12px;border-radius:8px;border:1px solid #ddd }
+
 .app-wrap { max-width:1200px;margin:auto;padding:30px }
-.search-card { background:white;border-radius:16px;padding:18px;box-shadow:0 12px 30px rgba(0,0,0,.08) }
+.search-card {
+  background:white;border-radius:16px;padding:18px;
+  box-shadow:0 12px 30px rgba(0,0,0,.08);
+  position:relative;
+}
 .search-input { width:100%;padding:14px;border-radius:10px;border:1px solid #e5e7eb;font-size:15px }
-.stock-grid { margin-top:24px;display:grid;grid-template-columns:repeat(auto-fill,minmax(320px,1fr));gap:20px }
+
+.dropdown {
+  position:absolute;left:18px;right:18px;top:68px;
+  background:white;border:1px solid #ddd;border-radius:10px;
+  max-height:240px;overflow-y:auto;z-index:999;
+  box-shadow:0 8px 20px rgba(0,0,0,.12)
+}
+.option { padding:10px 14px;cursor:pointer;font-size:14px }
+.option:hover { background:#f1f5f9 }
+
+.stock-grid {
+  margin-top:24px;
+  display:grid;
+  grid-template-columns:repeat(auto-fill,minmax(320px,1fr));
+  gap:20px;
+}
 .stock-card {
   background:white;border-radius:16px;padding:18px;
-  box-shadow:0 10px 30px rgba(0,0,0,.08);transition:.2s;
+  box-shadow:0 10px 30px rgba(0,0,0,.08);
+  transition:.2s;
 }
 .stock-card:hover { transform:translateY(-4px) }
 .stock-title { font-weight:600;font-size:16px }
@@ -113,34 +137,40 @@ button { background:#2563eb;color:white;border:none;border-radius:8px;padding:10
 <div class="app-wrap">
   <div class="search-card">
     <input id="search" class="search-input" placeholder="Search stock...">
-    <div id="dropdown"></div>
+    <div id="dropdown" class="dropdown"></div>
   </div>
   <div id="stockGrid" class="stock-grid"></div>
 </div>
 </div>
 
 <script>
-document.addEventListener("input", e=>{
-  if(e.target.id==="search"){
-    const q=e.target.value.toLowerCase();
-    const d=document.getElementById("dropdown"); d.innerHTML="";
-    allStocks.filter(s=>s.name.toLowerCase().includes(q))
-      .slice(0,10).forEach(s=>{
-        const div=document.createElement("div");
-        div.textContent=`${s.name} (${s.symbol})`;
-        div.onclick=()=>addStock(s);
-        d.appendChild(div);
-      });
-  }
+document.getElementById("search").addEventListener("input", e=>{
+  const q = e.target.value.toLowerCase();
+  const dropdown = document.getElementById("dropdown");
+  dropdown.innerHTML = "";
+  if(!q) return;
+
+  allStocks.filter(
+    s => s.name.toLowerCase().includes(q) || s.symbol.toLowerCase().includes(q)
+  ).slice(0,10).forEach(s=>{
+    const div = document.createElement("div");
+    div.className = "option";
+    div.textContent = `${s.name} (${s.symbol})`;
+    div.onclick = ()=> addStock(s);
+    dropdown.appendChild(div);
+  });
 });
 
-function addStock(s){
-  watchlist.push(s);
+function addStock(stock){
+  if(watchlist.find(s=>s.symbol===stock.symbol)) return;
+  watchlist.push(stock);
   document.getElementById("dropdown").innerHTML="";
+  document.getElementById("search").value="";
   render();
 }
 
 async function render(){
+  if(!watchlist.length) return;
   const syms = watchlist.map(s=>s.symbol).join(",");
   const r = await fetch(`/api/prices?symbols=${syms}`);
   const data = await r.json();
