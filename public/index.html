@@ -102,7 +102,7 @@ signupBtn.onclick=()=>createUserWithEmailAndPassword(auth,email.value,password.v
 logoutBtn.onclick=()=>signOut(auth);
 
 onAuthStateChanged(auth,async u=>{
-  if(!u)return;
+  if(!u) return;
   userId=u.uid;
   loginScreen.style.display="none";
   appScreen.style.display="block";
@@ -111,7 +111,7 @@ onAuthStateChanged(auth,async u=>{
   const snap=await getDoc(doc(db,"users",userId));
   if(snap.exists()) watchlist=snap.data().watchlist||[];
 
-  renderWatchlist();
+  render();
   loadAlerts();
   setInterval(checkAlerts,30000);
 });
@@ -123,40 +123,48 @@ search.addEventListener("input",e=>{
   dropdown.innerHTML="";
   const q=e.target.value.toLowerCase();
   if(!q)return;
-  allStocks.filter(s=>s.name.toLowerCase().includes(q)).slice(0,10).forEach(s=>{
-    const d=document.createElement("div");
-    d.className="option";
-    d.textContent=`${s.name} (${s.symbol})`;
-    d.onclick=()=>addStock(s);
-    dropdown.appendChild(d);
-  });
+  allStocks.filter(s=>s.name.toLowerCase().includes(q)||s.symbol.toLowerCase().includes(q))
+    .slice(0,10).forEach(s=>{
+      const d=document.createElement("div");
+      d.className="option";
+      d.textContent=`${s.name} (${s.symbol})`;
+      d.onclick=()=>addStock(s);
+      dropdown.appendChild(d);
+    });
 });
 
 async function addStock(s){
   if(watchlist.find(x=>x.symbol===s.symbol))return;
   watchlist.push(s);
   await setDoc(doc(db,"users",userId),{watchlist},{merge:true});
-  renderWatchlist();
-}
-
-function renderWatchlist(){
-  stockGrid.innerHTML="";
-  watchlist.forEach(s=>{
-    const d=document.createElement("div");
-    d.className="stock-card";
-    d.innerHTML=`<div style="display:flex;justify-content:space-between">
-      <span>${s.name}</span>
-      <button onclick="removeStock('${s.symbol}')">✕</button>
-    </div>`;
-    stockGrid.appendChild(d);
-  });
+  render();
 }
 
 window.removeStock=async sym=>{
   watchlist=watchlist.filter(s=>s.symbol!==sym);
   await setDoc(doc(db,"users",userId),{watchlist},{merge:true});
-  renderWatchlist();
+  render();
 };
+
+async function render(){
+  if(!watchlist.length){stockGrid.innerHTML="";return;}
+  const syms=watchlist.map(s=>s.symbol).join(",");
+  const data=await (await fetch(`/api/prices?symbols=${syms}`)).json();
+  stockGrid.innerHTML="";
+  watchlist.forEach(s=>{
+    const d=data[s.symbol]; if(!d)return;
+    const div=document.createElement("div");
+    div.className="stock-card";
+    div.innerHTML=`
+      <div style="display:flex;justify-content:space-between">
+        <span class="stock-title">${s.name}</span>
+        <button onclick="removeStock('${s.symbol}')">✕</button>
+      </div>
+      <div class="price">₹${d.price.toFixed(2)}</div>
+      <div class="${d.change>=0?'green':'red'}">${d.changePercent.toFixed(2)}%</div>`;
+    stockGrid.appendChild(div);
+  });
+}
 
 function populateAlertDropdown(){
   alertSymbol.innerHTML="";
