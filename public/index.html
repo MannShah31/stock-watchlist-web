@@ -5,64 +5,6 @@
 <title>Stock Watchlist</title>
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 
-<!-- Firebase -->
-<script type="module">
-import { initializeApp } from "https://www.gstatic.com/firebasejs/12.8.0/firebase-app.js";
-import {
-  getAuth,
-  signInWithEmailAndPassword,
-  createUserWithEmailAndPassword,
-  onAuthStateChanged,
-  signOut
-} from "https://www.gstatic.com/firebasejs/12.8.0/firebase-auth.js";
-
-const firebaseConfig = {
-  apiKey: "AIzaSyCd2vJNlGVh9q1GWT2M_GepSKolo-t2Sr4",
-  authDomain: "stock-watchlist-app-1eced.firebaseapp.com",
-  projectId: "stock-watchlist-app-1eced",
-  storageBucket: "stock-watchlist-app-1eced.firebasestorage.app",
-  messagingSenderId: "99623824439",
-  appId: "1:99623824439:web:21b9546b0ceee31ba623b2"
-};
-
-const app = initializeApp(firebaseConfig);
-const auth = getAuth(app);
-
-let allStocks = [];
-let watchlist = [];
-
-window.addEventListener("DOMContentLoaded", () => {
-  const loginScreen = document.getElementById("loginScreen");
-  const appScreen = document.getElementById("appScreen");
-  const email = document.getElementById("email");
-  const password = document.getElementById("password");
-
-  document.getElementById("loginBtn").onclick = () =>
-    signInWithEmailAndPassword(auth, email.value, password.value)
-      .catch(e => alert(e.message));
-
-  document.getElementById("signupBtn").onclick = () =>
-    createUserWithEmailAndPassword(auth, email.value, password.value)
-      .catch(e => alert(e.message));
-
-  document.getElementById("logoutBtn").onclick = () => signOut(auth);
-
-  onAuthStateChanged(auth, async user => {
-    if (user) {
-      loginScreen.style.display = "none";
-      appScreen.style.display = "block";
-
-      const r = await fetch("/api/stocks");
-      allStocks = await r.json();
-      console.log("Stocks loaded:", allStocks.length);
-    } else {
-      loginScreen.style.display = "flex";
-      appScreen.style.display = "none";
-    }
-  });
-});
-</script>
-
 <style>
 body { margin:0;font-family:Inter,Arial,sans-serif;background:#f4f6fb; }
 header {
@@ -113,10 +55,10 @@ button { background:#2563eb;color:white;border:none;border-radius:8px;padding:10
 .green{color:#16a34a;font-weight:600}
 .red{color:#dc2626;font-weight:600}
 </style>
+</head>
 
 <body>
 
-<!-- LOGIN -->
 <div id="loginScreen" class="login-wrap">
   <div class="login-card">
     <h2>Login / Sign Up</h2>
@@ -127,7 +69,6 @@ button { background:#2563eb;color:white;border:none;border-radius:8px;padding:10
   </div>
 </div>
 
-<!-- DASHBOARD -->
 <div id="appScreen" style="display:none">
 <header>
   <h3>📈 Stock Watchlist</h3>
@@ -143,7 +84,58 @@ button { background:#2563eb;color:white;border:none;border-radius:8px;padding:10
 </div>
 </div>
 
-<script>
+<script type="module">
+import { initializeApp } from "https://www.gstatic.com/firebasejs/12.8.0/firebase-app.js";
+import {
+  getAuth,
+  signInWithEmailAndPassword,
+  createUserWithEmailAndPassword,
+  onAuthStateChanged,
+  signOut
+} from "https://www.gstatic.com/firebasejs/12.8.0/firebase-auth.js";
+
+const firebaseConfig = {
+  apiKey: "AIzaSyCd2vJNlGVh9q1GWT2M_GepSKolo-t2Sr4",
+  authDomain: "stock-watchlist-app-1eced.firebaseapp.com",
+  projectId: "stock-watchlist-app-1eced",
+  storageBucket: "stock-watchlist-app-1eced.firebasestorage.app",
+  messagingSenderId: "99623824439",
+  appId: "1:99623824439:web:21b9546b0ceee31ba623b2"
+};
+
+const app = initializeApp(firebaseConfig);
+const auth = getAuth(app);
+
+let allStocks = [];
+let watchlist = [];
+
+const loginScreen = document.getElementById("loginScreen");
+const appScreen = document.getElementById("appScreen");
+
+document.getElementById("loginBtn").onclick = () =>
+  signInWithEmailAndPassword(auth, email.value, password.value)
+    .catch(e => alert(e.message));
+
+document.getElementById("signupBtn").onclick = () =>
+  createUserWithEmailAndPassword(auth, email.value, password.value)
+    .catch(e => alert(e.message));
+
+document.getElementById("logoutBtn").onclick = () => signOut(auth);
+
+onAuthStateChanged(auth, async user => {
+  if (user) {
+    loginScreen.style.display = "none";
+    appScreen.style.display = "block";
+
+    const r = await fetch("/api/stocks");
+    allStocks = await r.json();
+    console.log("Loaded", allStocks.length, "stocks");
+  } else {
+    loginScreen.style.display = "flex";
+    appScreen.style.display = "none";
+  }
+});
+
 document.getElementById("search").addEventListener("input", e=>{
   const q = e.target.value.toLowerCase();
   const dropdown = document.getElementById("dropdown");
@@ -194,5 +186,6 @@ async function render(){
   });
 }
 </script>
+
 </body>
 </html>
