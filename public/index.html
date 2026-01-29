@@ -32,117 +32,126 @@ window.addEventListener("DOMContentLoaded", () => {
   const appScreen = document.getElementById("appScreen");
   const email = document.getElementById("email");
   const password = document.getElementById("password");
-  const loginBtn = document.getElementById("loginBtn");
-  const signupBtn = document.getElementById("signupBtn");
-  const logoutBtn = document.getElementById("logoutBtn");
 
-  function showLogin() {
-    loginScreen.style.display = "flex";
-    appScreen.style.display = "none";
-  }
-
-  function showApp() {
-    loginScreen.style.display = "none";
-    appScreen.style.display = "block";
-  }
-
-  loginBtn.addEventListener("click", () => {
+  document.getElementById("loginBtn").onclick = () =>
     signInWithEmailAndPassword(auth, email.value, password.value)
-      .catch(err => alert(err.message));
-  });
+      .catch(e => alert(e.message));
 
-  signupBtn.addEventListener("click", () => {
+  document.getElementById("signupBtn").onclick = () =>
     createUserWithEmailAndPassword(auth, email.value, password.value)
-      .catch(err => alert(err.message));
-  });
+      .catch(e => alert(e.message));
 
-  logoutBtn.addEventListener("click", () => {
-    signOut(auth);
-  });
+  document.getElementById("logoutBtn").onclick = () => signOut(auth);
 
   onAuthStateChanged(auth, user => {
-    if (user) showApp();
-    else showLogin();
+    if (user) {
+      loginScreen.style.display = "none";
+      appScreen.style.display = "block";
+      initDashboard();
+    } else {
+      loginScreen.style.display = "flex";
+      appScreen.style.display = "none";
+    }
   });
 });
 </script>
 
 <style>
-body {
-  margin: 0;
-  font-family: Inter, Arial, sans-serif;
-  background: #f4f6fb;
-}
-
-header {
-  background: #2563eb;
-  color: white;
-  padding: 16px 24px;
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-}
-
-#loginScreen {
-  height: 100vh;
-  display: flex;
-  justify-content: center;
-  align-items: center;
-}
-
-.login-card {
-  background: white;
-  padding: 30px;
-  border-radius: 12px;
-  width: 320px;
-  box-shadow: 0 20px 40px rgba(0,0,0,0.1);
-}
-
-.login-card input {
-  width: 100%;
-  padding: 12px;
-  margin-bottom: 10px;
-  border-radius: 8px;
-  border: 1px solid #ddd;
-}
-
-.login-card button {
-  width: 100%;
-  padding: 10px;
-  border-radius: 8px;
-  border: none;
-  margin-top: 6px;
-  cursor: pointer;
-  background: #2563eb;
-  color: white;
-}
-
-#appScreen { display: none; }
+body { margin:0; font-family: Inter, Arial, sans-serif; background:#f4f6fb; }
+header { background:#2563eb; color:white; padding:16px 24px; display:flex; justify-content:space-between; align-items:center; }
+.card { background:white; padding:20px; border-radius:14px; box-shadow:0 20px 40px rgba(0,0,0,0.08); margin-top:20px; }
+input { padding:12px; width:100%; border-radius:8px; border:1px solid #ddd; }
+button { padding:10px 14px; border:none; border-radius:8px; background:#2563eb; color:white; cursor:pointer; }
+table { width:100%; border-collapse:collapse; }
+th,td { padding:10px; border-bottom:1px solid #ddd; }
+.green { color:#16a34a; font-weight:600 }
+.red { color:#dc2626; font-weight:600 }
 </style>
+</head>
 
 <body>
 
-<div id="loginScreen">
-  <div class="login-card">
+<!-- LOGIN -->
+<div id="loginScreen" style="height:100vh;display:flex;justify-content:center;align-items:center">
+  <div class="card" style="width:320px">
     <h2>Login / Sign Up</h2>
-    <input id="email" type="email" placeholder="Email" />
+    <input id="email" placeholder="Email" />
     <input id="password" type="password" placeholder="Password" />
     <button id="loginBtn">Login</button>
-    <button id="signupBtn">Sign Up</button>
+    <button id="signupBtn" style="margin-top:6px">Sign Up</button>
   </div>
 </div>
 
-<div id="appScreen">
-  <header>
-    <h3>📈 Stock Watchlist</h3>
-    <button id="logoutBtn">Logout</button>
-  </header>
+<!-- APP -->
+<div id="appScreen" style="display:none">
+<header>
+  <h3>📈 Stock Watchlist</h3>
+  <button id="logoutBtn">Logout</button>
+</header>
 
-  <div style="padding:30px">
-    <h2>Welcome 🎉</h2>
-    <p>Your stock dashboard will load here.</p>
+<div style="padding:30px">
+  <div class="card">
+    <input id="search" placeholder="Search stock..." />
+    <div id="dropdown"></div>
+  </div>
+
+  <div class="card">
+    <table>
+      <thead>
+        <tr>
+          <th>Stock</th><th>Price</th><th>Change</th><th>52W H</th><th>52W L</th><th>Vol</th>
+        </tr>
+      </thead>
+      <tbody id="watchlist"></tbody>
+    </table>
   </div>
 </div>
+</div>
+
+<script>
+let allStocks=[], watchlist=[];
+
+async function initDashboard(){
+  const r=await fetch("/api/stocks"); allStocks=await r.json();
+}
+
+document.addEventListener("input", e=>{
+  if(e.target.id==="search"){
+    const q=e.target.value.toLowerCase();
+    const list=allStocks.filter(s=>s.name.toLowerCase().includes(q));
+    const d=document.getElementById("dropdown"); d.innerHTML="";
+    list.slice(0,10).forEach(s=>{
+      const div=document.createElement("div");
+      div.textContent=`${s.name} (${s.symbol})`;
+      div.onclick=()=>addStock(s);
+      d.appendChild(div);
+    });
+  }
+});
+
+function addStock(s){
+  watchlist.push(s);
+  document.getElementById("dropdown").innerHTML="";
+  render();
+}
+
+async function render(){
+  const syms=watchlist.map(s=>s.symbol).join(",");
+  const r=await fetch(`/api/prices?symbols=${syms}`);
+  const data=await r.json();
+  const tb=document.getElementById("watchlist"); tb.innerHTML="";
+  watchlist.forEach(s=>{
+    const d=data[s.symbol];
+    const tr=document.createElement("tr");
+    tr.innerHTML=`
+      <td>${s.name}</td>
+      <td>₹${d.price.toFixed(2)}</td>
+      <td class="${d.change>=0?'green':'red'}">${d.changePercent.toFixed(2)}%</td>
+      <td>${d.high52}</td><td>${d.low52}</td><td>${d.volume}</td>`;
+    tb.appendChild(tr);
+  });
+}
+</script>
 
 </body>
 </html>
