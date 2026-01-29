@@ -62,19 +62,20 @@ button { background:#2563eb;color:white;border:none;border-radius:8px;padding:10
 .red{color:#dc2626;font-weight:600}
 
 .alert-card {
-  background:white;padding:20px;border-radius:16px;
+  background:white;padding:22px;border-radius:18px;
   box-shadow:0 10px 30px rgba(0,0,0,.08);margin-top:20px
 }
 .alert-row {
   display:flex;justify-content:space-between;align-items:center;
-  border-bottom:1px solid #eee;padding:10px 0
+  border-bottom:1px solid #eee;padding:12px 0
 }
 .alert-chip{
   background:#eef2ff;
   color:#1d4ed8;
-  padding:4px 10px;
-  border-radius:20px;
+  padding:6px 14px;
+  border-radius:999px;
   font-weight:600;
+  font-size:13px;
 }
 .alert-row button{
   background:#2563eb;
@@ -125,7 +126,7 @@ button { background:#2563eb;color:white;border:none;border-radius:8px;padding:10
     <div class="alert-card">
       <h3 style="margin-bottom:12px">🔔 Price Alerts</h3>
 
-      <!-- ADD ALERT (TOP) -->
+      <!-- ADD ALERT -->
       <div style="display:flex;gap:10px;margin-bottom:14px">
         <select id="alertSymbol" style="flex:1;padding:10px;border-radius:8px"></select>
         <input id="alertPrice" type="number" placeholder="Target Price"
@@ -281,6 +282,8 @@ function renderAlerts(){
     };
   });
 }
+
+window.addAlert = addAlert;
 </script>
 
 </body>
