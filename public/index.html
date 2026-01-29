@@ -84,7 +84,7 @@ button{background:#2563eb;color:white;border:none;border-radius:8px;padding:10px
 <script type="module">
 import { initializeApp } from "https://www.gstatic.com/firebasejs/12.8.0/firebase-app.js";
 import { getAuth, signInWithEmailAndPassword, createUserWithEmailAndPassword, onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/12.8.0/firebase-auth.js";
-import { getFirestore, doc, setDoc, getDoc, collection, addDoc, getDocs, deleteDoc, updateDoc } from "https://www.gstatic.com/firebasejs/12.8.0/firebase-firestore.js";
+import { getFirestore, doc, setDoc, getDoc, collection, addDoc, getDocs, deleteDoc, updateDoc, serverTimestamp } from "https://www.gstatic.com/firebasejs/12.8.0/firebase-firestore.js";
 
 const app = initializeApp({
   apiKey:"AIzaSyCd2vJNlGVh9q1GWT2M_GepSKolo-t2Sr4",
@@ -108,36 +108,42 @@ onAuthStateChanged(auth,async u=>{
   appScreen.style.display="block";
 
   allStocks=await (await fetch("/api/stocks")).json();
+
   const snap=await getDoc(doc(db,"users",userId));
   if(snap.exists()) watchlist=snap.data().watchlist||[];
 
   render();
   loadAlerts();
-  setInterval(checkAlerts,30000);
+
+  setInterval(render,15000);       // auto refresh prices
+  setInterval(checkAlerts,30000); // auto check alerts
 });
 
-tabWatch.onclick=()=>{watchTab.style.display="block";alertsTab.style.display="none"};
-tabAlerts.onclick=()=>{watchTab.style.display="none";alertsTab.style.display="block";populateAlertDropdown()};
+/* WATCHLIST */
+async function render(){
+  if(!watchlist.length)return;
+  const syms=watchlist.map(s=>s.symbol).join(",");
+  const data=await (await fetch(`/api/prices?symbols=${syms}`)).json();
 
-search.addEventListener("input",e=>{
-  dropdown.innerHTML="";
-  const q=e.target.value.toLowerCase();
-  if(!q)return;
-  allStocks.filter(s=>s.name.toLowerCase().includes(q)||s.symbol.toLowerCase().includes(q))
-    .slice(0,10).forEach(s=>{
-      const d=document.createElement("div");
-      d.className="option";
-      d.textContent=`${s.name} (${s.symbol})`;
-      d.onclick=()=>addStock(s);
-      dropdown.appendChild(d);
-    });
-});
-
-async function addStock(s){
-  if(watchlist.find(x=>x.symbol===s.symbol))return;
-  watchlist.push(s);
-  await setDoc(doc(db,"users",userId),{watchlist},{merge:true});
-  render();
+  stockGrid.innerHTML="";
+  watchlist.forEach(s=>{
+    const d=data[s.symbol]; if(!d)return;
+    const div=document.createElement("div");
+    div.className="stock-card";
+    div.innerHTML=`
+      <div style="display:flex;justify-content:space-between">
+        <b>${s.name}</b>
+        <button onclick="removeStock('${s.symbol}')">✕</button>
+      </div>
+      <div class="price">₹${d.price.toFixed(2)}</div>
+      <div class="${d.change>=0?'green':'red'}">${d.changePercent.toFixed(2)}%</div>
+      <div class="meta">
+        <div>52W H<br><b>${d.high52}</b></div>
+        <div>52W L<br><b>${d.low52}</b></div>
+        <div>Vol<br><b>${d.volume.toLocaleString()}</b></div>
+      </div>`;
+    stockGrid.appendChild(div);
+  });
 }
 
 window.removeStock=async sym=>{
@@ -146,58 +152,7 @@ window.removeStock=async sym=>{
   render();
 };
 
-async function render(){
-  if(!watchlist.length){stockGrid.innerHTML="";return;}
-
-  const syms = watchlist.map(s=>s.symbol).join(",");
-  const data = await (await fetch(`/api/prices?symbols=${syms}`)).json();
-
-  stockGrid.innerHTML="";
-  watchlist.forEach(s=>{
-    const d = data[s.symbol];
-    if(!d) return;
-
-    const div = document.createElement("div");
-    div.className="stock-card";
-    div.innerHTML=`
-      <div style="display:flex;justify-content:space-between">
-        <span class="stock-title">${s.name}</span>
-        <button onclick="removeStock('${s.symbol}')">✕</button>
-      </div>
-
-      <div class="price">₹${d.price.toFixed(2)}</div>
-      <div class="${d.change>=0?'green':'red'}">
-        ${d.changePercent.toFixed(2)}%
-      </div>
-
-      <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:8px;font-size:13px;color:#6b7280">
-        <div>52W H<br><b>${d.high52}</b></div>
-        <div>52W L<br><b>${d.low52}</b></div>
-        <div>Vol<br><b>${d.volume.toLocaleString()}</b></div>
-      </div>
-    `;
-    stockGrid.appendChild(div);
-  });
-}
-
-function populateAlertDropdown(){
-  alertSymbol.innerHTML="";
-  watchlist.forEach(s=>{
-    const o=document.createElement("option");
-    o.value=s.symbol;
-    o.textContent=`${s.name} (${s.symbol})`;
-    alertSymbol.appendChild(o);
-  });
-}
-
-addAlertBtn.onclick=async ()=>{
-  const s=alertSymbol.value;
-  const p=+alertPrice.value;
-  if(!s||!p)return alert("Fill both");
-  await addDoc(collection(db,"users",userId,"alerts"),{symbol:s,price:p,triggered:false,email:auth.currentUser.email});
-  loadAlerts();
-};
-
+/* ALERTS */
 async function loadAlerts(){
   alerts=[];
   const snap=await getDocs(collection(db,"users",userId,"alerts"));
@@ -205,14 +160,38 @@ async function loadAlerts(){
   renderAlerts();
 }
 
+addAlertBtn.onclick=async ()=>{
+  const s=alertSymbol.value;
+  const p=+alertPrice.value;
+  if(!s||!p)return alert("Fill both");
+
+  await addDoc(collection(db,"users",userId,"alerts"),{
+    symbol:s,
+    price:p,
+    email:auth.currentUser.email,
+    triggered:false,
+    createdAt: serverTimestamp(),
+    triggeredAt: null
+  });
+
+  alertPrice.value="";
+  loadAlerts();
+};
+
 function renderAlerts(){
   alertList.innerHTML="";
   alerts.forEach(a=>{
-    const d=document.createElement("div");
-    d.className="alert-row";
-    d.innerHTML=`<span class="alert-chip">${a.symbol}</span><span>₹${a.price}</span><button>✕</button>`;
-    d.querySelector("button").onclick=()=>deleteAlert(a.id);
-    alertList.appendChild(d);
+    const row=document.createElement("div");
+    row.className="alert-row";
+    row.innerHTML=`
+      <span class="alert-chip">${a.symbol}</span>
+      <span>₹${a.price}</span>
+      <span>${a.triggered?"Triggered":"Pending"}</span>
+      <span>${a.createdAt?.toDate?.().toLocaleString()||""}</span>
+      <span>${a.triggeredAt?.toDate?.().toLocaleString()||"-"}</span>
+      <button>✕</button>`;
+    row.querySelector("button").onclick=()=>deleteAlert(a.id);
+    alertList.appendChild(row);
   });
 }
 
@@ -221,16 +200,35 @@ async function deleteAlert(id){
   loadAlerts();
 }
 
+/* AUTO CHECK */
 async function checkAlerts(){
   if(!alerts.length)return;
+
   const syms=alerts.map(a=>a.symbol).join(",");
   const data=await (await fetch(`/api/prices?symbols=${syms}`)).json();
+
   for(const a of alerts){
     if(a.triggered)continue;
     const d=data[a.symbol];
-    if(d && d.price>=a.price){
-      await fetch("/api/alert",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({email:a.email,symbol:a.symbol,target:a.price,price:d.price})});
-      await updateDoc(doc(db,"users",userId,"alerts",a.id),{triggered:true});
+    if(!d) continue;
+
+    if(d.price>=a.price){
+      await fetch("/api/alert",{
+        method:"POST",
+        headers:{"Content-Type":"application/json"},
+        body:JSON.stringify({
+          email:a.email,
+          symbol:a.symbol,
+          target:a.price,
+          price:d.price
+        })
+      });
+
+      await updateDoc(doc(db,"users",userId,"alerts",a.id),{
+        triggered:true,
+        triggeredAt: serverTimestamp()
+      });
+
       loadAlerts();
     }
   }
