@@ -78,7 +78,7 @@ button { background:#2563eb;color:white;border:none;border-radius:8px;padding:10
   font-size:13px;
 }
 .alert-row button{
-  background:#2563eb;
+  background:#dc2626;
   border-radius:50%;
   width:32px;height:32px;
   display:flex;align-items:center;justify-content:center;
@@ -149,7 +149,7 @@ import {
 } from "https://www.gstatic.com/firebasejs/12.8.0/firebase-auth.js";
 
 import {
-  getFirestore, collection, addDoc, getDocs, deleteDoc, doc
+  getFirestore, collection, addDoc, getDocs, deleteDoc, doc, updateDoc
 } from "https://www.gstatic.com/firebasejs/12.8.0/firebase-firestore.js";
 
 const firebaseConfig = {
@@ -181,6 +181,7 @@ onAuthStateChanged(auth,async u=>{
     appScreen.style.display="block";
     allStocks = await (await fetch("/api/stocks")).json();
     loadAlerts();
+    setInterval(checkAlerts,30000);
   } else {
     loginScreen.style.display="flex";
     appScreen.style.display="none";
@@ -199,7 +200,9 @@ async function addAlert(){
   const p = Number(alertPrice.value);
   if(!s||!p) return alert("Select stock & price");
 
-  await addDoc(collection(db,"users",userId,"alerts"),{symbol:s,price:p,triggered:false});
+  await addDoc(collection(db,"users",userId,"alerts"),{
+    symbol:s,price:p,triggered:false,email:auth.currentUser.email
+  });
   alertPrice.value="";
   loadAlerts();
 }
@@ -221,6 +224,36 @@ function renderAlerts(){
 async function deleteAlert(id){
   await deleteDoc(doc(db,"users",userId,"alerts",id));
   loadAlerts();
+}
+
+/* 🔥 AUTO CHECK */
+async function checkAlerts(){
+  if(!alerts.length) return;
+
+  const syms = alerts.map(a=>a.symbol).join(",");
+  const data = await (await fetch(`/api/prices?symbols=${syms}`)).json();
+
+  for(const a of alerts){
+    if(a.triggered) continue;
+    const d = data[a.symbol];
+    if(!d) continue;
+
+    if(d.price >= a.price){
+      await fetch("/api/alert",{
+        method:"POST",
+        headers:{ "Content-Type":"application/json" },
+        body:JSON.stringify({
+          email:a.email,
+          symbol:a.symbol,
+          target:a.price,
+          price:d.price
+        })
+      });
+
+      await updateDoc(doc(db,"users",userId,"alerts",a.id),{triggered:true});
+      loadAlerts();
+    }
+  }
 }
 </script>
 
