@@ -5,22 +5,99 @@
 <title>Stock Watchlist</title>
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
 
-<!-- Firebase SDKs -->
+<script src="https://www.gstatic.com/firebasejs/12.8.0/firebase-app.js"></script>
+<script src="https://www.gstatic.com/firebasejs/12.8.0/firebase-auth.js"></script>
+
+<style>
+body {
+  margin: 0;
+  font-family: Inter, Arial, sans-serif;
+  background: #f4f6fb;
+}
+
+header {
+  background: #2563eb;
+  color: white;
+  padding: 16px 24px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.container {
+  max-width: 1200px;
+  margin: auto;
+  padding: 32px;
+}
+
+.card {
+  background: white;
+  padding: 24px;
+  border-radius: 14px;
+  box-shadow: 0 10px 30px rgba(0,0,0,0.08);
+}
+
+.center {
+  height: 100vh;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+}
+
+input, button {
+  width: 100%;
+  padding: 12px;
+  margin-top: 10px;
+  font-size: 15px;
+}
+
+button {
+  background: #2563eb;
+  color: white;
+  border: none;
+  border-radius: 8px;
+  cursor: pointer;
+}
+
+button.secondary {
+  background: #4f46e5;
+}
+
+.hidden { display: none; }
+</style>
+</head>
+
+<body>
+
+<!-- LOGIN SCREEN -->
+<div id="authScreen" class="center">
+  <div class="card" style="width:340px;">
+    <h2>Login / Sign Up</h2>
+    <input id="email" type="email" placeholder="Email" />
+    <input id="password" type="password" placeholder="Password" />
+    <button onclick="login()">Login</button>
+    <button class="secondary" onclick="signup()">Sign Up</button>
+  </div>
+</div>
+
+<!-- DASHBOARD -->
+<div id="appScreen" class="hidden">
+  <header>
+    <h3>📈 Stock Watchlist</h3>
+    <button onclick="logout()">Logout</button>
+  </header>
+
+  <div class="container">
+    <div class="card">
+      <h3>Welcome! Your dashboard is ready 🚀</h3>
+      <p>Now we’ll plug your stock UI here next.</p>
+    </div>
+  </div>
+</div>
+
 <script type="module">
 import { initializeApp } from "https://www.gstatic.com/firebasejs/12.8.0/firebase-app.js";
-import {
-  getAuth,
-  createUserWithEmailAndPassword,
-  signInWithEmailAndPassword,
-  onAuthStateChanged,
-  signOut
-} from "https://www.gstatic.com/firebasejs/12.8.0/firebase-auth.js";
-import {
-  getFirestore,
-  doc,
-  setDoc,
-  getDoc
-} from "https://www.gstatic.com/firebasejs/12.8.0/firebase-firestore.js";
+import { getAuth, signInWithEmailAndPassword, createUserWithEmailAndPassword, onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/12.8.0/firebase-auth.js";
 
 const firebaseConfig = {
   apiKey: "AIzaSyCd2vJNlGVh9q1GWT2M_GepSKolo-t2Sr4",
@@ -33,386 +110,32 @@ const firebaseConfig = {
 
 const app = initializeApp(firebaseConfig);
 const auth = getAuth(app);
-const db = getFirestore(app);
 
-emailjs.init("-nPbEj5p827UiuqEA");
+const authScreen = document.getElementById("authScreen");
+const appScreen = document.getElementById("appScreen");
 
-window.fbAuth = auth;
-window.fbDb = db;
-</script>
-
-<!-- Styles -->
-<style>
-body {
-  margin: 0;
-  font-family: "Inter", sans-serif;
-  background: #eef2f7;
-  color: #1f2937;
-}
-.header {
-  background: #2563eb;
-  padding: 16px 32px;
-  color: white;
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-}
-.container {
-  padding: 32px;
-  max-width: 1200px;
-  margin: auto;
-}
-.card {
-  background: white;
-  border-radius: 12px;
-  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.1);
-  padding: 24px;
-  margin-bottom: 24px;
-}
-input, select {
-  width: 100%;
-  padding: 12px;
-  font-size: 15px;
-  border-radius: 8px;
-  border: 1px solid #cbd5e1;
-}
-button {
-  padding: 10px 18px;
-  border: none;
-  border-radius: 8px;
-  background: #2563eb;
-  color: white;
-  font-weight: 600;
-  cursor: pointer;
-}
-button:hover {
-  background: #1e40af;
-}
-.table-container {
-  overflow-x: auto;
-}
-table {
-  width: 100%;
-  border-collapse: collapse;
-}
-th {
-  text-align: left;
-  padding: 12px;
-  background: #f1f5f9;
-  font-size: 14px;
-}
-td {
-  padding: 12px;
-  border-bottom: 1px solid #e2e8f0;
-  font-size: 14px;
-}
-.green { color: #16a34a; font-weight: 600; }
-.red { color: #dc2626; font-weight: 600; }
-.alert-input {
-  width: 80px;
-  padding: 6px;
-  border-radius: 6px;
-  border: 1px solid #cbd5e1;
-}
-.remove-btn {
-  background: none;
-  font-size: 18px;
-  color: #64748b;
-  cursor: pointer;
-}
-.remove-btn:hover {
-  color: #dc2626;
-}
-</style>
-</head>
-<body>
-
-<!-- Header -->
-<div class="header hidden" id="headerBar">
-  <div><strong>Stock Watchlist</strong></div>
-  <div>
-    <span id="userEmailDisplay"></span>
-    <button onclick="logoutUser()" style="margin-left:16px;">Logout</button>
-  </div>
-</div>
-
-<!-- Signup/Login Box -->
-<div class="container" id="authBox">
-  <div class="card" style="max-width:400px; margin:auto;">
-    <h2 style="margin-bottom:12px;">Login / Sign Up</h2>
-    <input id="email" placeholder="Enter your email" />
-    <input id="password" type="password" placeholder="Enter password" />
-    <button onclick="loginUser()">Login</button>
-    <button onclick="signupUser()">Sign Up</button>
-  </div>
-</div>
-
-<!-- Main App -->
-<div class="container hidden" id="mainApp">
-
-  <!-- Search & Filters -->
-  <div class="card">
-    <h3>Search Stocks</h3>
-    <input id="searchStock" placeholder="Search by symbol or name" />
-    <div id="dropdown" style="position:relative;"></div>
-    <select id="sectorFilter" style="margin-top:16px;">
-      <option value="ALL">All Sectors</option>
-    </select>
-  </div>
-
-  <!-- Watchlist -->
-  <div class="card table-card">
-    <h3>Your Watchlist</h3>
-    <div class="table-container">
-      <table>
-        <thead>
-          <tr>
-            <th>Stock</th>
-            <th>Price</th>
-            <th>Change</th>
-            <th>52W High</th>
-            <th>52W Low</th>
-            <th>Volume</th>
-            <th>Alert</th>
-            <th></th>
-          </tr>
-        </thead>
-        <tbody id="watchlist"></tbody>
-      </table>
-    </div>
-  </div>
-</div>
-
-<script>
-let loggedInUser = null;
-let allStocks = [];
-let myWatchlist = [];
-let myAlerts = [];
-let selectedSector = "ALL";
-
-const auth = window.fbAuth;
-const db = window.fbDb;
-
-// — Firebase Auth handlers —
-async function signupUser() {
-  const email = document.getElementById("email").value;
-  const pass = document.getElementById("password").value;
-  try {
-    await createUserWithEmailAndPassword(auth, email, pass);
-    alert("Signed up!");
-  } catch (err) {
-    alert("Signup error: " + err.message);
-  }
-}
-
-async function loginUser() {
-  const email = document.getElementById("email").value;
-  const pass = document.getElementById("password").value;
-  try {
-    await signInWithEmailAndPassword(auth, email, pass);
-  } catch (err) {
-    alert("Login error: " + err.message);
-  }
-}
-
-function logoutUser() {
-  signOut(auth);
-}
-
-onAuthStateChanged(auth, async user => {
+onAuthStateChanged(auth, user => {
   if (user) {
-    loggedInUser = user;
-    document.getElementById("authBox").classList.add("hidden");
-    document.getElementById("headerBar").classList.remove("hidden");
-    document.getElementById("mainApp").classList.remove("hidden");
-    document.getElementById("userEmailDisplay").textContent = user.email;
-
-    // load watchlist from Firestore
-    const ref = doc(db, "watchlists", user.uid);
-    const snap = await getDoc(ref);
-    if (snap.exists()) {
-      const data = snap.data();
-      myWatchlist = data.stocks || [];
-      myAlerts = data.alerts || [];
-    }
-
-    await loadStocks();
-    populateSectorFilter();
-    renderWatchlist();
+    authScreen.classList.add("hidden");
+    appScreen.classList.remove("hidden");
   } else {
-    document.getElementById("headerBar").classList.add("hidden");
-    document.getElementById("mainApp").classList.add("hidden");
-    document.getElementById("authBox").classList.remove("hidden");
+    appScreen.classList.add("hidden");
+    authScreen.classList.remove("hidden");
   }
 });
 
-// — Firebase save —
-async function saveUserData() {
-  await setDoc(doc(db, "watchlists", loggedInUser.uid), {
-    stocks: myWatchlist,
-    alerts: myAlerts
-  });
-}
+window.login = () => {
+  signInWithEmailAndPassword(auth, email.value, password.value)
+    .catch(e => alert(e.message));
+};
 
-// — Search & Dropdown —
-document.getElementById("searchStock").addEventListener("input", e => {
-  const q = e.target.value.toLowerCase();
-  if (!q) return (document.getElementById("dropdown").innerHTML = "");
-  const filtered = allStocks.filter(
-    s =>
-      (s.name.toLowerCase().includes(q) ||
-       s.symbol.toLowerCase().includes(q)) &&
-      (selectedSector === "ALL" || s.sector === selectedSector)
-  );
-  renderDropdown(filtered);
-});
+window.signup = () => {
+  createUserWithEmailAndPassword(auth, email.value, password.value)
+    .catch(e => alert(e.message));
+};
 
-function renderDropdown(list) {
-  const dropdown = document.getElementById("dropdown");
-  dropdown.innerHTML = "";
-  list.slice(0, 10).forEach(stock => {
-    const div = document.createElement("div");
-    div.style.padding = "10px";
-    div.style.cursor = "pointer";
-    div.textContent = `${stock.name} (${stock.symbol})`;
-    div.onclick = () => addToWatchlist(stock);
-    dropdown.appendChild(div);
-  });
-}
-
-// — Add / Remove —
-function addToWatchlist(stock) {
-  if (myWatchlist.find(s => s.symbol === stock.symbol)) return;
-  myWatchlist.push(stock);
-  saveUserData();
-  renderWatchlist();
-}
-
-function removeFromWatchlist(symbol) {
-  myWatchlist = myWatchlist.filter(s => s.symbol !== symbol);
-  myAlerts = myAlerts.filter(a => a.symbol !== symbol);
-  saveUserData();
-  renderWatchlist();
-}
-
-::contentReference[oaicite:0]{index=0}
-// — Populate sector dropdown after stocks load
-function populateSectorFilter() {
-  const select = document.getElementById("sectorFilter");
-  select.innerHTML = `<option value="ALL">All Sectors</option>`;
-
-  const sectors = [...new Set(allStocks.map(s => s.sector).filter(Boolean))].sort();
-  sectors.forEach(sector => {
-    const opt = document.createElement("option");
-    opt.value = sector;
-    opt.textContent = sector;
-    select.appendChild(opt);
-  });
-
-  select.onchange = e => {
-    selectedSector = e.target.value;
-    renderWatchlist();
-  };
-}
-
-// — Fetch stocks master list from backend
-async function loadStocks() {
-  const res = await fetch("/api/stocks");
-  allStocks = await res.json();
-}
-
-// — Render watchlist table for logged-in user
-async function renderWatchlist() {
-  const tbody = document.getElementById("watchlist");
-  tbody.innerHTML = "";
-
-  if (!myWatchlist.length) return;
-
-  const filtered = selectedSector === "ALL"
-    ? myWatchlist
-    : myWatchlist.filter(s => s.sector === selectedSector);
-
-  if (!filtered.length) return;
-
-  const symbols = filtered.map(s => s.symbol).join(",");
-  const priceRes = await fetch(`/api/prices?symbols=${symbols}`);
-  const prices = await priceRes.json();
-
-  filtered.forEach(stock => {
-    const d = prices[stock.symbol];
-    if (!d) return;
-
-    const alertEntry = myAlerts.find(a => a.symbol === stock.symbol && !a.triggered);
-
-    const tr = document.createElement("tr");
-    tr.innerHTML = `
-      <td>${stock.name}</td>
-      <td>₹ ${d.price.toFixed(2)}</td>
-      <td class="${d.change >= 0 ? "green" : "red"}">${d.changePercent.toFixed(2)}%</td>
-      <td>${d.high52}</td>
-      <td>${d.low52}</td>
-      <td>${d.volume.toLocaleString()}</td>
-      <td>
-        <input class="alert-input" type="number" placeholder="₹"
-          onkeydown="if(event.key==='Enter') setAlert('${stock.symbol}', this.value)">
-        ${alertEntry ? `<div style="font-size:12px;color:#2563eb;">@ ₹${alertEntry.price}</div>` : ""}
-      </td>
-      <td>
-        <button class="remove-btn" onclick="removeFromWatchlist('${stock.symbol}')">✕</button>
-      </td>
-    `;
-    tbody.appendChild(tr);
-  });
-}
-
-// — Alert logic saved per user
-function setAlert(symbol, price) {
-  price = Number(price);
-  if (!price || isNaN(price)) return;
-
-  myAlerts.push({ symbol, price, triggered: false });
-  saveUserData();
-  alert(`Alert set for ${symbol} at ₹${price}`);
-}
-
-// — Check alerts on refresh
-function checkAlerts(prices) {
-  myAlerts.forEach(a => {
-    if (a.triggered) return;
-    const d = prices[a.symbol];
-    if (!d) return;
-
-    if (d.price >= a.price) {
-      a.triggered = true;
-      saveUserData();
-
-      // Browser notification
-      if ("Notification" in window && Notification.permission === "granted") {
-        new Notification("Stock Alert 🚨", {
-          body: `${a.symbol} crossed ₹${a.price}`
-        });
-      }
-
-      // Email alert
-      if (loggedInUser && loggedInUser.email) {
-        emailjs.send("service_38gmuds", "template_sem5vlb", {
-          to_email: loggedInUser.email,
-          symbol: a.symbol,
-          alert_price: a.price,
-          current_price: d.price.toFixed(2),
-          change: d.change.toFixed(2),
-          change_percent: d.changePercent.toFixed(2)
-        });
-      }
-    }
-  });
-}
-
-// — Periodic refresh
-setInterval(() => {
-  if (myWatchlist.length) renderWatchlist();
-}, 15000);
-
+window.logout = () => signOut(auth);
 </script>
+
 </body>
 </html>
