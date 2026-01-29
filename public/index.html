@@ -1,9 +1,9 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-<meta charset="UTF-8" />
+<meta charset="UTF-8">
 <title>Stock Watchlist</title>
-<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
 
 <script type="module">
 import { initializeApp } from "https://www.gstatic.com/firebasejs/12.8.0/firebase-app.js";
@@ -27,6 +27,9 @@ const firebaseConfig = {
 const app = initializeApp(firebaseConfig);
 const auth = getAuth(app);
 
+let allStocks = [];
+let watchlist = [];
+
 window.addEventListener("DOMContentLoaded", () => {
   const loginScreen = document.getElementById("loginScreen");
   const appScreen = document.getElementById("appScreen");
@@ -43,11 +46,12 @@ window.addEventListener("DOMContentLoaded", () => {
 
   document.getElementById("logoutBtn").onclick = () => signOut(auth);
 
-  onAuthStateChanged(auth, user => {
+  onAuthStateChanged(auth, async user => {
     if (user) {
       loginScreen.style.display = "none";
       appScreen.style.display = "block";
-      initDashboard();
+      const r = await fetch("/api/stocks");
+      allStocks = await r.json();
     } else {
       loginScreen.style.display = "flex";
       appScreen.style.display = "none";
@@ -58,74 +62,75 @@ window.addEventListener("DOMContentLoaded", () => {
 
 <style>
 body { margin:0; font-family: Inter, Arial, sans-serif; background:#f4f6fb; }
-header { background:#2563eb; color:white; padding:16px 24px; display:flex; justify-content:space-between; align-items:center; }
-.card { background:white; padding:20px; border-radius:14px; box-shadow:0 20px 40px rgba(0,0,0,0.08); margin-top:20px; }
-input { padding:12px; width:100%; border-radius:8px; border:1px solid #ddd; }
-button { padding:10px 14px; border:none; border-radius:8px; background:#2563eb; color:white; cursor:pointer; }
-table { width:100%; border-collapse:collapse; }
-th,td { padding:10px; border-bottom:1px solid #ddd; }
-.green { color:#16a34a; font-weight:600 }
-.red { color:#dc2626; font-weight:600 }
+header {
+  background: linear-gradient(90deg,#2563eb,#1d4ed8);
+  color:white; padding:18px 32px;
+  display:flex; justify-content:space-between; align-items:center;
+}
+button { background:#2563eb;color:white;border:none;border-radius:8px;padding:10px 14px;cursor:pointer }
+.login-wrap { height:100vh; display:flex; justify-content:center; align-items:center; }
+.login-card {
+  width:320px;background:white;padding:28px;border-radius:14px;
+  box-shadow:0 20px 40px rgba(0,0,0,0.12);
+}
+.login-card input { width:100%;padding:12px;margin-bottom:10px;border-radius:8px;border:1px solid #ddd }
+.app-wrap { max-width:1200px;margin:auto;padding:30px }
+.search-card { background:white;border-radius:16px;padding:18px;box-shadow:0 12px 30px rgba(0,0,0,.08) }
+.search-input { width:100%;padding:14px;border-radius:10px;border:1px solid #e5e7eb;font-size:15px }
+.stock-grid { margin-top:24px;display:grid;grid-template-columns:repeat(auto-fill,minmax(320px,1fr));gap:20px }
+.stock-card {
+  background:white;border-radius:16px;padding:18px;
+  box-shadow:0 10px 30px rgba(0,0,0,.08);transition:.2s;
+}
+.stock-card:hover { transform:translateY(-4px) }
+.stock-title { font-weight:600;font-size:16px }
+.price { font-size:26px;font-weight:700;margin:6px 0 }
+.meta { display:grid;grid-template-columns:repeat(3,1fr);gap:8px;font-size:13px;color:#6b7280 }
+.green{color:#16a34a;font-weight:600}
+.red{color:#dc2626;font-weight:600}
 </style>
-</head>
 
 <body>
 
 <!-- LOGIN -->
-<div id="loginScreen" style="height:100vh;display:flex;justify-content:center;align-items:center">
-  <div class="card" style="width:320px">
+<div id="loginScreen" class="login-wrap">
+  <div class="login-card">
     <h2>Login / Sign Up</h2>
-    <input id="email" placeholder="Email" />
-    <input id="password" type="password" placeholder="Password" />
+    <input id="email" placeholder="Email">
+    <input id="password" type="password" placeholder="Password">
     <button id="loginBtn">Login</button>
     <button id="signupBtn" style="margin-top:6px">Sign Up</button>
   </div>
 </div>
 
-<!-- APP -->
+<!-- DASHBOARD -->
 <div id="appScreen" style="display:none">
 <header>
   <h3>📈 Stock Watchlist</h3>
   <button id="logoutBtn">Logout</button>
 </header>
 
-<div style="padding:30px">
-  <div class="card">
-    <input id="search" placeholder="Search stock..." />
+<div class="app-wrap">
+  <div class="search-card">
+    <input id="search" class="search-input" placeholder="Search stock...">
     <div id="dropdown"></div>
   </div>
-
-  <div class="card">
-    <table>
-      <thead>
-        <tr>
-          <th>Stock</th><th>Price</th><th>Change</th><th>52W H</th><th>52W L</th><th>Vol</th>
-        </tr>
-      </thead>
-      <tbody id="watchlist"></tbody>
-    </table>
-  </div>
+  <div id="stockGrid" class="stock-grid"></div>
 </div>
 </div>
 
 <script>
-let allStocks=[], watchlist=[];
-
-async function initDashboard(){
-  const r=await fetch("/api/stocks"); allStocks=await r.json();
-}
-
 document.addEventListener("input", e=>{
   if(e.target.id==="search"){
     const q=e.target.value.toLowerCase();
-    const list=allStocks.filter(s=>s.name.toLowerCase().includes(q));
     const d=document.getElementById("dropdown"); d.innerHTML="";
-    list.slice(0,10).forEach(s=>{
-      const div=document.createElement("div");
-      div.textContent=`${s.name} (${s.symbol})`;
-      div.onclick=()=>addStock(s);
-      d.appendChild(div);
-    });
+    allStocks.filter(s=>s.name.toLowerCase().includes(q))
+      .slice(0,10).forEach(s=>{
+        const div=document.createElement("div");
+        div.textContent=`${s.name} (${s.symbol})`;
+        div.onclick=()=>addStock(s);
+        d.appendChild(div);
+      });
   }
 });
 
@@ -136,22 +141,28 @@ function addStock(s){
 }
 
 async function render(){
-  const syms=watchlist.map(s=>s.symbol).join(",");
-  const r=await fetch(`/api/prices?symbols=${syms}`);
-  const data=await r.json();
-  const tb=document.getElementById("watchlist"); tb.innerHTML="";
+  const syms = watchlist.map(s=>s.symbol).join(",");
+  const r = await fetch(`/api/prices?symbols=${syms}`);
+  const data = await r.json();
+  const grid=document.getElementById("stockGrid");
+  grid.innerHTML="";
   watchlist.forEach(s=>{
     const d=data[s.symbol];
-    const tr=document.createElement("tr");
-    tr.innerHTML=`
-      <td>${s.name}</td>
-      <td>₹${d.price.toFixed(2)}</td>
-      <td class="${d.change>=0?'green':'red'}">${d.changePercent.toFixed(2)}%</td>
-      <td>${d.high52}</td><td>${d.low52}</td><td>${d.volume}</td>`;
-    tb.appendChild(tr);
+    if(!d) return;
+    const div=document.createElement("div");
+    div.className="stock-card";
+    div.innerHTML=`
+      <div class="stock-title">${s.name}</div>
+      <div class="price">₹${d.price.toFixed(2)}</div>
+      <div class="${d.change>=0?'green':'red'}">${d.changePercent.toFixed(2)}%</div>
+      <div class="meta">
+        <div>52W H<br><b>${d.high52}</b></div>
+        <div>52W L<br><b>${d.low52}</b></div>
+        <div>Vol<br><b>${d.volume.toLocaleString()}</b></div>
+      </div>`;
+    grid.appendChild(div);
   });
 }
 </script>
-
 </body>
 </html>
