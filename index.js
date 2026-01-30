@@ -15,9 +15,9 @@ const HOST = "0.0.0.0";
 // =====================
 // EmailJS config
 // =====================
-const EMAILJS_SERVICE = process.env.EMAILJS_SERVICE;
-const EMAILJS_TEMPLATE = process.env.EMAILJS_TEMPLATE;
-const EMAILJS_PUBLIC = process.env.EMAILJS_PUBLIC;
+const EMAILJS_SERVICE = process.env.EMAILJS_SERVICE_ID;
+const EMAILJS_TEMPLATE = process.env.EMAILJS_TEMPLATE_ID;
+const EMAILJS_PUBLIC = process.env.EMAILJS_PUBLIC_KEY;
 
 // --------------------
 // Health
@@ -90,7 +90,12 @@ app.post("/api/alert", async (req, res) => {
       })
     });
 
-    if (!response.ok) throw new Error("EmailJS failed");
+    const text = await response.text();
+
+    if (!response.ok) {
+      console.error("❌ EmailJS response:", text);
+      throw new Error("EmailJS failed");
+    }
 
     console.log("📧 EMAIL SENT →", email);
     res.json({ ok: true });
