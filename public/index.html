@@ -83,6 +83,12 @@ button{background:#2563eb;color:white;border:none;border-radius:8px;padding:10px
 </div>
 </div>
 
+<!-- EMAILJS -->
+<script src="https://cdn.jsdelivr.net/npm/emailjs-com@3/dist/email.min.js"></script>
+<script>
+  emailjs.init("-nPbEj5p827UiuqEA");
+</script>
+
 <script type="module">
 import { initializeApp } from "https://www.gstatic.com/firebasejs/12.8.0/firebase-app.js";
 import { getAuth, signInWithEmailAndPassword, createUserWithEmailAndPassword, onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/12.8.0/firebase-auth.js";
@@ -99,7 +105,6 @@ const db = getFirestore(app);
 
 let allStocks=[], watchlist=[], alerts=[], userId=null;
 
-/* AUTH */
 loginBtn.onclick=()=>signInWithEmailAndPassword(auth,email.value,password.value);
 signupBtn.onclick=()=>createUserWithEmailAndPassword(auth,email.value,password.value);
 logoutBtn.onclick=()=>signOut(auth);
@@ -119,10 +124,6 @@ onAuthStateChanged(auth,async u=>{
   setInterval(render,15000);
   setInterval(checkAlerts,30000);
 });
-
-/* TABS */
-tabWatch.onclick=()=>{watchTab.style.display="block";alertsTab.style.display="none"};
-tabAlerts.onclick=()=>{watchTab.style.display="none";alertsTab.style.display="block";populateAlertDropdown();renderAlerts()};
 
 /* SEARCH */
 search.addEventListener("input",e=>{
@@ -187,6 +188,18 @@ function populateAlertDropdown(){
   });
 }
 
+tabAlerts.onclick=()=>{
+  watchTab.style.display="none";
+  alertsTab.style.display="block";
+  populateAlertDropdown();
+  renderAlerts();
+};
+
+tabWatch.onclick=()=>{
+  watchTab.style.display="block";
+  alertsTab.style.display="none";
+};
+
 addAlertBtn.onclick=async ()=>{
   const s=alertSymbol.value;
   const p=+alertPrice.value;
@@ -228,17 +241,27 @@ async function deleteAlert(id){
   loadAlerts();
 }
 
-/* AUTO CHECK */
+/* 🔥 AUTO CHECK + EMAILJS */
 async function checkAlerts(){
   if(!alerts.length)return;
   const syms=alerts.map(a=>a.symbol).join(",");
   const data=await (await fetch(`/api/prices?symbols=${syms}`)).json();
+
   for(const a of alerts){
     if(a.triggered)continue;
     const d=data[a.symbol];
-    if(d && d.price>=a.price){
-      await fetch("/api/alert",{method:"POST",headers:{"Content-Type":"application/json"},
-        body:JSON.stringify({email:a.email,symbol:a.symbol,target:a.price,price:d.price})});
+    if(!d)continue;
+
+    if(d.price>=a.price){
+      await emailjs.send("service_38gmuds","template_sem5vlb",{
+        to_email:a.email,
+        symbol:a.symbol,
+        alert_price:a.price,
+        current_price:d.price,
+        change:d.change,
+        change_percent:d.changePercent
+      });
+
       await updateDoc(doc(db,"users",userId,"alerts",a.id),
         {triggered:true,triggeredAt:serverTimestamp()});
       loadAlerts();
