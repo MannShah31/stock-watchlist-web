@@ -9,12 +9,12 @@
 body{
   margin:0;
   font-family:Inter,Arial,sans-serif;
-  background:#0b1220;
+  background:#050b18;
   color:#e5e7eb;
 }
 
 header{
-  background:linear-gradient(90deg,#0f172a,#020617);
+  background:linear-gradient(90deg,#020617,#020617);
   color:#fff;
   padding:18px 32px;
   display:flex;
@@ -77,10 +77,20 @@ button{
 }
 
 .stock-card{
-  background:#111a2e;
+  background:linear-gradient(145deg,#0b1228,#070f24);
   border-radius:16px;
   padding:18px;
-  box-shadow:0 0 0 1px #1f2a44;
+  box-shadow:
+    0 10px 40px rgba(0,0,0,.6),
+    inset 0 0 0 1px #1f2a44;
+  transition:.25s;
+}
+
+.stock-card:hover{
+  transform:translateY(-4px);
+  box-shadow:
+    0 20px 60px rgba(0,0,0,.7),
+    inset 0 0 0 1px #3b82f6;
 }
 
 .price{font-size:26px;font-weight:700;margin:6px 0}
@@ -103,6 +113,12 @@ button{
   border-radius:999px;
   font-weight:600;
   font-size:13px;
+}
+.stock-grid{
+  margin-top:24px;
+  display:grid;
+  grid-template-columns:repeat(auto-fill,minmax(320px,1fr));
+  gap:20px;
 }
 </style>
 </head>
