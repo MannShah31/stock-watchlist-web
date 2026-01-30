@@ -86,6 +86,18 @@ button{
   transition:.25s;
 }
 
+.stock-card.pos{
+  box-shadow:
+    0 10px 40px rgba(0,0,0,.6),
+    inset 0 0 0 1px #1f2a44,
+    0 0 18px rgba(34,197,94,.25);
+}
+.stock-card.neg {
+  box-shadow:
+    0 10px 40px rgba(0,0,0,.6),
+    inset 0 0 0 1px #1f2a44,
+    0 0 18px rgba(239,68,68,.25);
+}
 .stock-card:hover{
   transform:translateY(-4px);
   box-shadow:
@@ -120,6 +132,10 @@ button{
   grid-template-columns:repeat(auto-fill,minmax(320px,1fr));
   gap:20px;
 }
+.compact .stock-card{padding:12px}
+.compact .price{font-size:20px}
+.compact .stock-grid{grid-template-columns:repeat(auto-fill,minmax(260px,1fr))}
+
 </style>
 </head>
 
@@ -217,18 +233,58 @@ onAuthStateChanged(auth,async u=>{
 });
 
 /* SEARCH */
-search.addEventListener("input",e=>{
-  const q=e.target.value.toLowerCase();
-  dropdown.innerHTML="";
-  if(!q)return;
-  allStocks.filter(s=>s.name.toLowerCase().includes(q)||s.symbol.toLowerCase().includes(q))
-    .slice(0,10).forEach(s=>{
-      const d=document.createElement("div");
-      d.className="option";
-      d.textContent=`${s.name} (${s.symbol})`;
-      d.onclick=()=>addStock(s);
-      dropdown.appendChild(d);
-    });
+let activeIndex = -1;
+
+search.addEventListener("input", e => {
+  const q = e.target.value.toLowerCase().trim();
+  dropdown.innerHTML = "";
+  activeIndex = -1;
+  if (!q) return;
+
+  const results = allStocks.filter(s =>
+    s.name.toLowerCase().includes(q) ||
+    s.symbol.toLowerCase().includes(q) ||
+    (s.sector && s.sector.toLowerCase().includes(q))
+  ).slice(0, 12);
+
+  results.forEach((s, i) => {
+    const d = document.createElement("div");
+    d.className = "option";
+    d.innerHTML = `
+      <div style="display:flex;justify-content:space-between;align-items:center">
+        <span>${s.name} (${s.symbol})</span>
+        <small style="opacity:.6">${s.sector || ""}</small>
+      </div>
+    `;
+
+    if (watchlist.find(x => x.symbol === s.symbol)) {
+      d.style.opacity = ".4";
+      d.style.pointerEvents = "none";
+    } else {
+      d.onclick = () => addStock(s);
+    }
+
+    dropdown.appendChild(d);
+  });
+});
+
+/* ⌨ Keyboard nav */
+search.addEventListener("keydown", e => {
+  const items = dropdown.querySelectorAll(".option");
+  if (!items.length) return;
+
+  if (e.key === "ArrowDown") {
+    activeIndex = (activeIndex + 1) % items.length;
+  } else if (e.key === "ArrowUp") {
+    activeIndex = (activeIndex - 1 + items.length) % items.length;
+  } else if (e.key === "Enter" && activeIndex >= 0) {
+    items[activeIndex].click();
+    return;
+  } else return;
+
+  items.forEach((el, i) =>
+    el.style.background = i === activeIndex ? "#1e293b" : "transparent"
+  );
 });
 
 /* WATCHLIST */
@@ -241,34 +297,57 @@ async function addStock(s){
 }
 
 async function render(){
-  if(!watchlist.length)return;
-  const syms=watchlist.map(s=>s.symbol).join(",");
-  const data=await (await fetch(`/api/prices?symbols=${syms}`)).json();
-  stockGrid.innerHTML="";
-  watchlist.forEach(s=>{
-    const d=data[s.symbol]; if(!d)return;
-    const div=document.createElement("div");
-    div.className="stock-card";
-    div.innerHTML=`
-      <div style="display:flex;justify-content:space-between">
+  if(!watchlist.length){
+    stockGrid.innerHTML = `<p style="opacity:.5">Add stocks to your watchlist</p>`;
+    return;
+  }
+
+  const syms = watchlist.map(s => s.symbol).join(",");
+  const data = await (await fetch(`/api/prices?symbols=${syms}`)).json();
+
+  stockGrid.innerHTML = "";
+
+  watchlist.forEach(s => {
+    const d = data[s.symbol];
+    if(!d) return;
+
+    const div = document.createElement("div");
+    div.className = `stock-card ${d.change >= 0 ? "pos" : "neg"}`;
+
+    div.innerHTML = `
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px">
         <a href="https://www.screener.in/company/${s.symbol.replace(".NS","").replace(".BO","")}/"
-          target="_blank"
-          style="color:#1d4ed8;text-decoration:none;font-weight:600">
-          ${s.name}
+           target="_blank"
+           style="color:#60a5fa;text-decoration:none;font-weight:600;font-size:14px">
+           ${s.name}
         </a>
-        <button onclick="removeStock('${s.symbol}')">✕</button>
+
+        <button
+          style="background:#020617;border:1px solid #1f2a44;color:#9ca3af;padding:4px 8px;border-radius:8px"
+          onclick="removeStock('${s.symbol}')">✕</button>
       </div>
-      <div class="price">₹${d.price.toFixed(2)}</div>
-      <div class="${d.change>=0?'green':'red'}">${d.changePercent.toFixed(2)}%</div>
-      <div>52W H: ${d.high52} | 52W L: ${d.low52}</div>
-      <div>Vol: ${d.volume.toLocaleString()}</div>`;
+
+      <div style="display:flex;align-items:end;justify-content:space-between">
+        <div class="price">₹${d.price.toFixed(2)}</div>
+        <div class="${d.change>=0?'green':'red'}" style="font-weight:600">
+          ${d.change>=0?'+':''}${d.changePercent.toFixed(2)}%
+        </div>
+      </div>
+
+      <div style="display:flex;justify-content:space-between;font-size:12px;opacity:.7;margin-top:6px">
+        <span>H: ${d.high52}</span>
+        <span>L: ${d.low52}</span>
+        <span>Vol: ${d.volume.toLocaleString()}</span>
+      </div>
+    `;
+
     stockGrid.appendChild(div);
   });
 }
 
-window.removeStock=async sym=>{
-  watchlist=watchlist.filter(s=>s.symbol!==sym);
-  await setDoc(doc(db,"users",userId),{watchlist},{merge:true});
+window.removeStock = async sym => {
+  watchlist = watchlist.filter(s => s.symbol !== sym);
+  await setDoc(doc(db,"users",userId),{ watchlist },{ merge:true });
   render();
 };
 
