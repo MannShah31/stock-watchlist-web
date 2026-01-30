@@ -13,11 +13,15 @@ const PORT = process.env.PORT || 3000;
 const HOST = "0.0.0.0";
 
 // =====================
-// EmailJS config
+// EmailJS ENV
 // =====================
 const EMAILJS_SERVICE = process.env.EMAILJS_SERVICE_ID;
 const EMAILJS_TEMPLATE = process.env.EMAILJS_TEMPLATE_ID;
 const EMAILJS_PUBLIC = process.env.EMAILJS_PUBLIC_KEY;
+
+if (!EMAILJS_SERVICE || !EMAILJS_TEMPLATE || !EMAILJS_PUBLIC) {
+  console.warn("⚠️ EmailJS ENV variables missing");
+}
 
 // --------------------
 // Health
@@ -72,29 +76,32 @@ app.post("/api/alert", async (req, res) => {
   }
 
   try {
-    const response = await fetch("https://api.emailjs.com/api/v1.0/email/send", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        service_id: EMAILJS_SERVICE,
-        template_id: EMAILJS_TEMPLATE,
-        user_id: EMAILJS_PUBLIC,
-        template_params: {
-          to_email: email,
-          symbol,
-          alert_price: target,
-          current_price: price,
-          change,
-          change_percent: changePercent
-        }
-      })
-    });
+    const response = await fetch(
+      "https://api.emailjs.com/api/v1.0/email/send",
+      {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          service_id: EMAILJS_SERVICE,
+          template_id: EMAILJS_TEMPLATE,
+          user_id: EMAILJS_PUBLIC,
+          template_params: {
+            to_email: email,
+            symbol,
+            alert_price: target,
+            current_price: price,
+            change,
+            change_percent: changePercent
+          }
+        })
+      }
+    );
 
     const text = await response.text();
 
     if (!response.ok) {
       console.error("❌ EmailJS response:", text);
-      throw new Error("EmailJS failed");
+      return res.status(500).json({ error: "EmailJS failed" });
     }
 
     console.log("📧 EMAIL SENT →", email);
