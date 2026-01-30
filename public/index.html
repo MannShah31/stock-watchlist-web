@@ -160,7 +160,11 @@ async function render(){
     div.className="stock-card";
     div.innerHTML=`
       <div style="display:flex;justify-content:space-between">
-        <b>${s.name}</b>
+        <a href="https://www.screener.in/company/${s.symbol.replace(".NS","").replace(".BO","")}/"
+          target="_blank"
+          style="color:#1d4ed8;text-decoration:none;font-weight:600">
+          ${s.name}
+        </a>
         <button onclick="removeStock('${s.symbol}')">✕</button>
       </div>
       <div class="price">₹${d.price.toFixed(2)}</div>
