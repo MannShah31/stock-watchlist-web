@@ -243,33 +243,47 @@ const db = getFirestore(app);
 
 let allStocks=[], watchlist=[], alerts=[], userId=null;
 
-loginBtn.onclick=()=>signInWithEmailAndPassword(auth,email.value,password.value);
-signupBtn.onclick=()=>createUserWithEmailAndPassword(auth,email.value,password.value);
+loginBtn.onclick = async () => {
+  try {
+    await signInWithEmailAndPassword(auth, email.value, password.value);
+  } catch (e) {
+    alert(e.message);
+  }
+};
+
+signupBtn.onclick = async () => {
+  try {
+    await createUserWithEmailAndPassword(auth, email.value, password.value);
+    alert("Account created. Now login.");
+  } catch (e) {
+    alert(e.message);
+  }
+};
+
 logoutBtn.onclick = async () => {
   await signOut(auth);
-  appScreen.style.display = "none";
-  loginScreen.style.display = "flex";
 };
 
 onAuthStateChanged(auth, async u => {
   if(!u){
+    userId = null;
+    watchlist = [];
+    alerts = [];
     loginScreen.style.display = "flex";
     appScreen.style.display = "none";
     return;
   }
 
-  userId = u.uid; // 🔴 THIS WAS MISSING
+  userId = u.uid;
   loginScreen.style.display = "none";
   appScreen.style.display = "block";
 
-  allStocks=await (await fetch("/api/stocks")).json();
-  const snap=await getDoc(doc(db,"users",userId));
-  if(snap.exists()) watchlist=snap.data().watchlist||[];
+  allStocks = await (await fetch("/api/stocks")).json();
+  const snap = await getDoc(doc(db,"users",userId));
+  watchlist = snap.exists() ? snap.data().watchlist || [] : [];
 
   render();
   loadAlerts();
-  setInterval(render,15000);
-  setInterval(checkAlerts,30000);
 });
 
 /* SEARCH */
