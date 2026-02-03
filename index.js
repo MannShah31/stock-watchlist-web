@@ -1,3 +1,4 @@
+app.use(express.static("public"));
 const express = require("express");
 const https = require("https");
 const fs = require("fs");
@@ -5,12 +6,24 @@ const path = require("path");
 const fetch = (...args) =>
   import("node-fetch").then(({ default: fetch }) => fetch(...args));
 
+const admin = require("firebase-admin");
+
 const app = express();
 app.use(express.json());
 app.use(express.static("public"));
 
 const PORT = process.env.PORT || 3000;
 const HOST = "0.0.0.0";
+
+// =====================
+// Firebase Admin Init
+// =====================
+if (!admin.apps.length) {
+  admin.initializeApp({
+    credential: admin.credential.applicationDefault()
+  });
+}
+const fdb = admin.firestore();
 
 // =====================
 // EmailJS ENV
@@ -145,6 +158,81 @@ app.get("/api/version", (_, res) => {
   res.json({ version: "fan-out-v1 + emailjs" });
 });
 
+// =======================
+// 🔔 GLOBAL ALERT WATCHER
+// =======================
+async function checkAllAlerts() {
+  try {
+    const users = await fdb.collection("users").get();
+
+    for (const u of users.docs) {
+      const alertsSnap = await fdb
+        .collection("users")
+        .doc(u.id)
+        .collection("alerts")
+        .where("triggered", "==", false)
+        .get();
+
+      if (alertsSnap.empty) continue;
+
+      const alerts = alertsSnap.docs.map(d => ({
+        id: d.id,
+        ...d.data(),
+        uid: u.id
+      }));
+
+      const symbols = [...new Set(alerts.map(a => a.symbol))];
+
+      const prices = {};
+      for (let i = 0; i < symbols.length; i += 5) {
+        const chunk = symbols.slice(i, i + 5);
+        const data = await Promise.all(chunk.map(fetchSingleStock));
+        data.forEach(d => d && (prices[d.symbol] = d));
+      }
+
+      for (const a of alerts) {
+        const d = prices[a.symbol];
+        if (!d) continue;
+
+        if (d.price >= a.price) {
+          console.log("🔥 ALERT TRIGGERED:", a.symbol, d.price);
+
+          await fetch("http://localhost:3000/api/alert", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              email: a.email,
+              symbol: a.symbol,
+              target: a.price,
+              price: d.price,
+              change: d.change,
+              changePercent: d.changePercent
+            })
+          });
+
+          await fdb
+            .collection("users")
+            .doc(a.uid)
+            .collection("alerts")
+            .doc(a.id)
+            .update({
+              triggered: true,
+              triggeredAt: admin.firestore.FieldValue.serverTimestamp()
+            });
+        }
+      }
+    }
+  } catch (err) {
+    console.error("❌ Alert engine error:", err.message);
+  }
+}
+
+// Run every 30 seconds
+setInterval(checkAllAlerts, 30000);
+
+// --------------------
+// Start Server
+// --------------------
 app.listen(PORT, HOST, () => {
   console.log(`🚀 Server running on ${HOST}:${PORT}`);
 });
