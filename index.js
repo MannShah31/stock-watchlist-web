@@ -1,4 +1,3 @@
-app.use(express.static("public"));
 const express = require("express");
 const https = require("https");
 const fs = require("fs");
@@ -8,7 +7,7 @@ const fetch = (...args) =>
 
 const admin = require("firebase-admin");
 
-const app = express();
+const app = express(); // ✅ must come first
 app.use(express.json());
 app.use(express.static("public"));
 
@@ -110,9 +109,8 @@ app.post("/api/alert", async (req, res) => {
       }
     );
 
-    const text = await response.text();
-
     if (!response.ok) {
+      const text = await response.text();
       console.error("❌ EmailJS response:", text);
       return res.status(500).json({ error: "EmailJS failed" });
     }
@@ -149,13 +147,9 @@ app.get("/api/prices", async (req, res) => {
   res.json(results);
 });
 
-app.get("/api/stocks", (req, res) => {
+app.get("/api/stocks", (_, res) => {
   const file = path.join(__dirname, "stocks.json");
   res.json(JSON.parse(fs.readFileSync(file, "utf8")));
-});
-
-app.get("/api/version", (_, res) => {
-  res.json({ version: "fan-out-v1 + emailjs" });
 });
 
 // =======================
@@ -197,7 +191,7 @@ async function checkAllAlerts() {
         if (d.price >= a.price) {
           console.log("🔥 ALERT TRIGGERED:", a.symbol, d.price);
 
-          await fetch("http://localhost:3000/api/alert", {
+          await fetch("https://stock-watchlist-web.onrender.com/api/alert", {
             method: "POST",
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify({
@@ -227,11 +221,9 @@ async function checkAllAlerts() {
   }
 }
 
-// Run every 30 seconds
+// run every 30 sec
 setInterval(checkAllAlerts, 30000);
 
-// --------------------
-// Start Server
 // --------------------
 app.listen(PORT, HOST, () => {
   console.log(`🚀 Server running on ${HOST}:${PORT}`);
