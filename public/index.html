@@ -140,16 +140,46 @@ button{
 </head>
 
 <body>
+.login-wrap{
+  height:100vh;
+  display:flex;
+  justify-content:center;
+  align-items:center;
+  background:radial-gradient(circle at top,#1e293b,#020617);
+}
+.login-card{
+  width:360px;
+  background:rgba(15,23,42,.9);
+  padding:32px;
+  border-radius:18px;
+  box-shadow:0 30px 80px rgba(0,0,0,.7);
+  text-align:center;
+}
+.login-card input{
+  width:100%;
+  padding:12px;
+  margin-bottom:12px;
+  border-radius:10px;
+  border:1px solid #1f2a44;
+  background:#020617;
+  color:white;
+}
 
 <div id="loginScreen" class="login-wrap">
   <div class="login-card">
-    <h2>Login / Sign Up</h2>
+    <h2 style="margin-bottom:6px">📈 Stock Watchlist</h2>
+    <p style="opacity:.6;margin-bottom:18px">Track. Alert. Win.</p>
+
     <input id="email" placeholder="Email">
     <input id="password" type="password" placeholder="Password">
+
     <button id="loginBtn">Login</button>
-    <button id="signupBtn">Sign Up</button>
+    <button id="signupBtn" style="margin-top:8px;background:#020617;border:1px solid #1f2a44">
+      Sign Up
+    </button>
   </div>
 </div>
+
 
 <div id="appScreen" style="display:none">
 <header>
@@ -214,13 +244,18 @@ let allStocks=[], watchlist=[], alerts=[], userId=null;
 
 loginBtn.onclick=()=>signInWithEmailAndPassword(auth,email.value,password.value);
 signupBtn.onclick=()=>createUserWithEmailAndPassword(auth,email.value,password.value);
-logoutBtn.onclick=()=>signOut(auth);
+logoutBtn.onclick = async () => {
+  await signOut(auth);
+  appScreen.style.display = "none";
+  loginScreen.style.display = "flex";
+};
 
 onAuthStateChanged(auth,async u=>{
-  if(!u)return;
-  userId=u.uid;
-  loginScreen.style.display="none";
-  appScreen.style.display="block";
+  if(!u){
+    loginScreen.style.display="flex";
+    appScreen.style.display="none";
+    return;
+  }
 
   allStocks=await (await fetch("/api/stocks")).json();
   const snap=await getDoc(doc(db,"users",userId));
