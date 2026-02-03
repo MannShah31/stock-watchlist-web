@@ -135,11 +135,6 @@ button{
 .compact .stock-card{padding:12px}
 .compact .price{font-size:20px}
 .compact .stock-grid{grid-template-columns:repeat(auto-fill,minmax(260px,1fr))}
-
-</style>
-</head>
-
-<body>
 .login-wrap{
   height:100vh;
   display:flex;
@@ -147,6 +142,7 @@ button{
   align-items:center;
   background:radial-gradient(circle at top,#1e293b,#020617);
 }
+
 .login-card{
   width:360px;
   background:rgba(15,23,42,.9);
@@ -155,6 +151,7 @@ button{
   box-shadow:0 30px 80px rgba(0,0,0,.7);
   text-align:center;
 }
+
 .login-card input{
   width:100%;
   padding:12px;
@@ -164,6 +161,10 @@ button{
   background:#020617;
   color:white;
 }
+</style>
+</head>
+
+<body>
 
 <div id="loginScreen" class="login-wrap">
   <div class="login-card">
@@ -250,12 +251,16 @@ logoutBtn.onclick = async () => {
   loginScreen.style.display = "flex";
 };
 
-onAuthStateChanged(auth,async u=>{
+onAuthStateChanged(auth, async u => {
   if(!u){
-    loginScreen.style.display="flex";
-    appScreen.style.display="none";
+    loginScreen.style.display = "flex";
+    appScreen.style.display = "none";
     return;
   }
+
+  userId = u.uid; // 🔴 THIS WAS MISSING
+  loginScreen.style.display = "none";
+  appScreen.style.display = "block";
 
   allStocks=await (await fetch("/api/stocks")).json();
   const snap=await getDoc(doc(db,"users",userId));
