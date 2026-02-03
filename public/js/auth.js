@@ -1,16 +1,34 @@
-export async function getStocks() {
-  return await (await fetch("/api/stocks")).json();
-}
+import { auth } from "./firebase.js";
+import { signInWithEmailAndPassword, createUserWithEmailAndPassword, onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/12.8.0/firebase-auth.js";
 
-export async function getPrices(symbols) {
-  const syms = symbols.join(",");
-  return await (await fetch(`/api/prices?symbols=${syms}`)).json();
-}
+export function setupAuth({ loginBtn, signupBtn, logoutBtn, loginScreen, appScreen, onLogin, onLogout }) {
 
-export async function sendAlert(payload) {
-  return await fetch("/api/alert", {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify(payload)
+  loginBtn.onclick = async () => {
+    try {
+      await signInWithEmailAndPassword(auth, email.value, password.value);
+    } catch (e) {
+      alert(e.message);
+    }
+  };
+
+  signupBtn.onclick = async () => {
+    try {
+      await createUserWithEmailAndPassword(auth, email.value, password.value);
+      alert("Account created. Now login.");
+    } catch (e) {
+      alert(e.message);
+    }
+  };
+
+  logoutBtn.onclick = async () => {
+    await signOut(auth);
+  };
+
+  onAuthStateChanged(auth, user => {
+    if (!user) {
+      onLogout();
+    } else {
+      onLogin(user);
+    }
   });
 }
