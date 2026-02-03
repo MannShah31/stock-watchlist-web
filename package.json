@@ -25,6 +25,7 @@
   "homepage": "https://github.com/MannShah31/stock-watchlist-web#readme",
   "dependencies": {
     "express": "^5.2.1",
+    "firebase-admin": "^13.6.0",
     "node-fetch": "^3.3.2",
     "nodemailer": "^7.0.13"
   }
