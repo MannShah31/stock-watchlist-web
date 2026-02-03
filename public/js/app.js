@@ -1,6 +1,7 @@
 import { setupAuth } from "./auth.js";
 import { getAllStocks } from "./api.js";
 import { setupWatchlist } from "./watchlist.js";
+import { loadAlerts, checkAlerts, renderAlerts } from "./alerts.js";
 
 let userId = null;
 let watchlist = [];
