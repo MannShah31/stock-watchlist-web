@@ -1,10 +1,5 @@
-import {
-  collection,
-  addDoc,
-  getDocs,
-  deleteDoc
-} from "https://www.gstatic.com/firebasejs/12.8.0/firebase-firestore.js";
-
+import { collection, addDoc, getDocs, deleteDoc, doc } from
+  "https://www.gstatic.com/firebasejs/12.8.0/firebase-firestore.js";
 import { db } from "./firebase.js";
 
 export function setupAlerts({
@@ -16,8 +11,7 @@ export function setupAlerts({
   getWatchlist
 }) {
 
-  // 🔄 Fill dropdown from watchlist
-  function populate() {
+  function populateDropdown() {
     alertSymbol.innerHTML = "";
     getWatchlist().forEach(s => {
       const o = document.createElement("option");
@@ -27,54 +21,52 @@ export function setupAlerts({
     });
   }
 
-  // ➕ Add new alert
   addAlertBtn.onclick = async () => {
-    const sym = alertSymbol.value;
-    const price = +alertPrice.value;
-    if (!sym || !price) return alert("Fill both fields");
+    const uid = getUserId();
+    if (!uid) return alert("Not logged in");
 
-    await addDoc(collection(db, "users", getUserId(), "alerts"), {
-      symbol: sym,
+    const symbol = alertSymbol.value;
+    const price = Number(alertPrice.value);
+    if (!symbol || !price) return alert("Fill both");
+
+    await addDoc(collection(db, "users", uid, "alerts"), {
+      symbol,
       price,
-      email: window.currentUser.email,
       triggered: false,
       createdAt: new Date()
     });
 
     alertPrice.value = "";
-    load();
+    loadAlerts();
   };
 
-  // 🔄 Load alerts
-  async function load() {
+  async function loadAlerts() {
+    const uid = getUserId();
+    if (!uid) return;
+
+    const snap = await getDocs(collection(db, "users", uid, "alerts"));
     alertList.innerHTML = "";
-    const snap = await getDocs(
-      collection(db, "users", getUserId(), "alerts")
-    );
 
     snap.forEach(d => {
       const a = d.data();
       const row = document.createElement("div");
       row.className = "alert-row";
-
       row.innerHTML = `
         <span class="alert-chip">${a.symbol}</span>
         <span>₹${a.price}</span>
         <span>${a.triggered ? "Triggered" : "Pending"}</span>
         <button>✕</button>
       `;
-
       row.querySelector("button").onclick = async () => {
-        await deleteDoc(d.ref);
-        load();
+        await deleteDoc(doc(db, "users", uid, "alerts", d.id));
+        loadAlerts();
       };
-
       alertList.appendChild(row);
     });
   }
 
   return {
-    populate,
-    load
+    populateDropdown,
+    loadAlerts
   };
 }

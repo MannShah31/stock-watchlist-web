@@ -24,11 +24,15 @@ const alertPrice = document.getElementById("alertPrice");
 const addAlertBtn = document.getElementById("addAlertBtn");
 const alertList = document.getElementById("alertList");
 
+// tabs
 const tabWatch = document.getElementById("tabWatch");
 const tabAlerts = document.getElementById("tabAlerts");
 const watchTab = document.getElementById("watchTab");
 const alertsTab = document.getElementById("alertsTab");
 
+let alerts = null;
+
+// ---------- AUTH ----------
 setupAuth({
   loginBtn,
   signupBtn,
@@ -45,7 +49,7 @@ setupAuth({
 
     window.allStocks = await getAllStocks();
 
-    const watch = setupWatchlist({
+    const wl = setupWatchlist({
       stockGrid,
       dropdown,
       search,
@@ -54,7 +58,7 @@ setupAuth({
       setWatchlist: v => (watchlist = v)
     });
 
-    const alerts = setupAlerts({
+    alerts = setupAlerts({
       alertSymbol,
       alertPrice,
       addAlertBtn,
@@ -63,9 +67,9 @@ setupAuth({
       getWatchlist: () => watchlist
     });
 
-    watch.render();
-    alerts.populate();
-    alerts.load();
+    wl.render();
+    alerts.populateDropdown();
+    alerts.loadAlerts();
   },
 
   onLogout: () => {
@@ -78,7 +82,7 @@ setupAuth({
   }
 });
 
-// tab switch
+// ---------- TAB SWITCH ----------
 tabWatch.onclick = () => {
   tabWatch.classList.add("active");
   tabAlerts.classList.remove("active");
@@ -91,4 +95,9 @@ tabAlerts.onclick = () => {
   tabWatch.classList.remove("active");
   watchTab.style.display = "none";
   alertsTab.style.display = "block";
+
+  if (alerts) {
+    alerts.populateDropdown();
+    alerts.loadAlerts();
+  }
 };
