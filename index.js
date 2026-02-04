@@ -19,8 +19,10 @@ const HOST = "0.0.0.0";
 // =====================
 if (!admin.apps.length) {
   admin.initializeApp({
-    credential: admin.credential.applicationDefault()
-  });
+  credential: admin.credential.cert(
+    JSON.parse(process.env.FIREBASE_ADMIN)
+  )
+});
 }
 const fdb = admin.firestore();
 
