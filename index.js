@@ -193,7 +193,7 @@ async function checkAllAlerts() {
         if (d.price >= a.price) {
           console.log("🔥 ALERT TRIGGERED:", a.symbol, d.price);
 
-          await fetch("https://stock-watchlist-web.onrender.com/api/alert", {
+          await fetch(`http://localhost:${PORT}/api/alert`, {
             method: "POST",
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify({
