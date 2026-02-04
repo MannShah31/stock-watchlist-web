@@ -72,14 +72,17 @@ setupAuth({
     alerts.loadAlerts();
   },
 
-  onLogout: () => {
-    userId = null;
-    watchlist = [];
-    window.currentUser = null;
+onLogout: () => {
+  userId = null;
+  watchlist = [];
+  window.currentUser = null;
 
-    loginScreen.style.display = "flex";
-    appScreen.style.display = "none";
-  }
+  alertList.innerHTML = "";
+  alertSymbol.innerHTML = "";
+
+  loginScreen.style.display = "flex";
+  appScreen.style.display = "none";
+}
 });
 
 // ---------- TAB SWITCH ----------
