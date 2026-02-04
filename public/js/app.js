@@ -1,7 +1,8 @@
-import { setupAuth } from "/js/auth.js";
-import { getAllStocks } from "/js/api.js";
-import { setupWatchlist } from "/js/watchlist.js";
-import { setupAlerts } from "/js/alerts.js";
+import { setupAuth } from "./auth.js";
+import { getAllStocks } from "./api.js";
+import { setupWatchlist } from "./watchlist.js";
+import { setupAlerts } from "./alerts.js";
+
 
 let userId = null;
 let watchlist = [];
