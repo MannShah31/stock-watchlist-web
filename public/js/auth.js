@@ -1,11 +1,28 @@
 import { auth } from "./firebase.js";
-import { signInWithEmailAndPassword, createUserWithEmailAndPassword, onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/12.8.0/firebase-auth.js";
+import {
+  signInWithEmailAndPassword,
+  createUserWithEmailAndPassword,
+  onAuthStateChanged,
+  signOut
+} from "https://www.gstatic.com/firebasejs/12.8.0/firebase-auth.js";
 
-export function setupAuth({ loginBtn, signupBtn, logoutBtn, loginScreen, appScreen, onLogin, onLogout }) {
+export function setupAuth({
+  loginBtn,
+  signupBtn,
+  logoutBtn,
+  loginScreen,
+  appScreen,
+  onLogin,
+  onLogout
+}) {
 
   loginBtn.onclick = async () => {
     try {
-      await signInWithEmailAndPassword(auth, email.value, password.value);
+      await signInWithEmailAndPassword(
+        auth,
+        email.value.trim(),
+        password.value
+      );
     } catch (e) {
       alert(e.message);
     }
@@ -13,7 +30,11 @@ export function setupAuth({ loginBtn, signupBtn, logoutBtn, loginScreen, appScre
 
   signupBtn.onclick = async () => {
     try {
-      await createUserWithEmailAndPassword(auth, email.value, password.value);
+      await createUserWithEmailAndPassword(
+        auth,
+        email.value.trim(),
+        password.value
+      );
       alert("Account created. Now login.");
     } catch (e) {
       alert(e.message);
@@ -25,10 +46,7 @@ export function setupAuth({ loginBtn, signupBtn, logoutBtn, loginScreen, appScre
   };
 
   onAuthStateChanged(auth, user => {
-    if (!user) {
-      onLogout();
-    } else {
-      onLogin(user);
-    }
+    if (user) onLogin(user);
+    else onLogout();
   });
 }
