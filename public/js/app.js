@@ -3,9 +3,9 @@ import { getAllStocks } from "./api.js";
 import { setupWatchlist } from "./watchlist.js";
 import { setupAlerts } from "./alerts.js";
 
-
 let userId = null;
 let watchlist = [];
+window.currentUser = null;
 
 const loginScreen = document.getElementById("loginScreen");
 const appScreen = document.getElementById("appScreen");
@@ -38,12 +38,14 @@ setupAuth({
 
   onLogin: async user => {
     userId = user.uid;
+    window.currentUser = user;
+
     loginScreen.style.display = "none";
     appScreen.style.display = "block";
 
     window.allStocks = await getAllStocks();
 
-    const { render } = setupWatchlist({
+    const watch = setupWatchlist({
       stockGrid,
       dropdown,
       search,
@@ -52,8 +54,7 @@ setupAuth({
       setWatchlist: v => (watchlist = v)
     });
 
-    // 🔥 WIRE ALERTS
-    setupAlerts({
+    const alerts = setupAlerts({
       alertSymbol,
       alertPrice,
       addAlertBtn,
@@ -62,18 +63,22 @@ setupAuth({
       getWatchlist: () => watchlist
     });
 
-    render();
+    watch.render();
+    alerts.populate();
+    alerts.load();
   },
 
   onLogout: () => {
     userId = null;
     watchlist = [];
+    window.currentUser = null;
+
     loginScreen.style.display = "flex";
     appScreen.style.display = "none";
   }
 });
 
-// TAB SWITCH
+// tab switch
 tabWatch.onclick = () => {
   tabWatch.classList.add("active");
   tabAlerts.classList.remove("active");
