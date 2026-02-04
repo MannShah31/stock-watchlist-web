@@ -1,10 +1,17 @@
-import { auth } from "./firebase.js";
+import { auth, db } from "./firebase.js";
 import {
   signInWithEmailAndPassword,
   createUserWithEmailAndPassword,
   onAuthStateChanged,
   signOut
 } from "https://www.gstatic.com/firebasejs/12.8.0/firebase-auth.js";
+
+import {
+  doc,
+  setDoc,
+  getDoc,
+  serverTimestamp
+} from "https://www.gstatic.com/firebasejs/12.8.0/firebase-firestore.js";
 
 export function setupAuth({
   loginBtn,
@@ -30,11 +37,19 @@ export function setupAuth({
 
   signupBtn.onclick = async () => {
     try {
-      await createUserWithEmailAndPassword(
+      const cred = await createUserWithEmailAndPassword(
         auth,
         email.value.trim(),
         password.value
       );
+
+      // 🔥 CREATE USER DOC ON SIGNUP
+      await setDoc(doc(db, "users", cred.user.uid), {
+        email: cred.user.email,
+        watchlist: [],
+        createdAt: serverTimestamp()
+      });
+
       alert("Account created. Now login.");
     } catch (e) {
       alert(e.message);
@@ -45,8 +60,21 @@ export function setupAuth({
     await signOut(auth);
   };
 
-  onAuthStateChanged(auth, user => {
-    if (user) onLogin(user);
-    else onLogout();
+  onAuthStateChanged(auth, async user => {
+    if (user) {
+      // ensure user doc exists (for old users)
+      const ref = doc(db, "users", user.uid);
+      const snap = await getDoc(ref);
+      if (!snap.exists()) {
+        await setDoc(ref, {
+          email: user.email,
+          watchlist: [],
+          createdAt: serverTimestamp()
+        });
+      }
+      onLogin(user);
+    } else {
+      onLogout();
+    }
   });
 }
