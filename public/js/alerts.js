@@ -1,5 +1,10 @@
-import { collection, addDoc, getDocs, deleteDoc, doc } from
-  "https://www.gstatic.com/firebasejs/12.8.0/firebase-firestore.js";
+import {
+  collection,
+  addDoc,
+  getDocs,
+  deleteDoc,
+  doc
+} from "https://www.gstatic.com/firebasejs/12.8.0/firebase-firestore.js";
 import { db } from "./firebase.js";
 
 export function setupAlerts({
@@ -32,17 +37,41 @@ export function setupAlerts({
     await addDoc(collection(db, "users", uid, "alerts"), {
       symbol,
       price,
+      email: window.currentUser.email,
       triggered: false,
       createdAt: new Date()
     });
 
     alertPrice.value = "";
+    await triggerAlertCheck();   // 🔥 FORCE CHECK
     loadAlerts();
   };
+
+  async function triggerAlertCheck() {
+    const uid = getUserId();
+    if (!uid) return;
+
+    // collect symbols from alerts
+    const snap = await getDocs(collection(db, "users", uid, "alerts"));
+    const symbols = [];
+
+    snap.forEach(d => {
+      const a = d.data();
+      if (!a.triggered) symbols.push(a.symbol);
+    });
+
+    if (!symbols.length) return;
+
+    // 🔔 THIS CALL IS CRITICAL
+    await fetch(`/api/prices?symbols=${symbols.join(",")}`);
+  }
 
   async function loadAlerts() {
     const uid = getUserId();
     if (!uid) return;
+
+    // 🔔 ENSURE CHECK RUNS WHEN TAB OPENS
+    await triggerAlertCheck();
 
     const snap = await getDocs(collection(db, "users", uid, "alerts"));
     alertList.innerHTML = "";
