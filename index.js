@@ -7,7 +7,7 @@ const fetch = (...args) =>
 
 const admin = require("firebase-admin");
 
-const app = express(); // ✅ must come first
+const app = express();
 app.use(express.json());
 app.use(express.static("public"));
 
@@ -19,10 +19,10 @@ const HOST = "0.0.0.0";
 // =====================
 if (!admin.apps.length) {
   admin.initializeApp({
-  credential: admin.credential.cert(
-    JSON.parse(process.env.FIREBASE_ADMIN)
-  )
-});
+    credential: admin.credential.cert(
+      JSON.parse(process.env.FIREBASE_ADMIN)
+    )
+  });
 }
 const fdb = admin.firestore();
 
@@ -80,59 +80,36 @@ function fetchSingleStock(symbol) {
 }
 
 // --------------------
-// SEND EMAIL via EmailJS
+// SEND EMAIL (direct)
 // --------------------
-app.post("/api/alert", async (req, res) => {
-  const { email, symbol, target, price, change, changePercent } = req.body;
-
-  if (!email || !symbol || !target || !price) {
-    return res.status(400).json({ error: "Missing fields" });
-  }
-
-  try {
-    const response = await fetch(
-      "https://api.emailjs.com/api/v1.0/email/send",
-      {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          service_id: EMAILJS_SERVICE,
-          template_id: EMAILJS_TEMPLATE,
-          user_id: EMAILJS_PUBLIC,
-          template_params: {
-            to_email: email,
-            symbol,
-            alert_price: target,
-            current_price: price,
-            change,
-            change_percent: changePercent
-          }
-        })
+async function sendAlertEmail({ email, symbol, target, price, change, changePercent }) {
+  const response = await fetch("https://api.emailjs.com/api/v1.0/email/send", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      service_id: EMAILJS_SERVICE,
+      template_id: EMAILJS_TEMPLATE,
+      user_id: EMAILJS_PUBLIC,
+      template_params: {
+        to_email: email,
+        symbol,
+        alert_price: target,
+        current_price: price,
+        change,
+        change_percent: changePercent
       }
-    );
+    })
+  });
 
-    if (!response.ok) {
-      const text = await response.text();
-      console.error("❌ EmailJS response:", text);
-      return res.status(500).json({ error: "EmailJS failed" });
-    }
-
-    console.log("📧 EMAIL SENT →", email);
-    res.json({ ok: true });
-  } catch (err) {
-    console.error("❌ EMAILJS ERROR:", err.message);
-    res.status(500).json({ error: "Mail failed" });
+  if (!response.ok) {
+    const text = await response.text();
+    throw new Error(text);
   }
-});
+}
 
 // --------------------
 // APIs
 // --------------------
-app.get("/api/stock", async (req, res) => {
-  const data = await fetchSingleStock(req.query.symbol);
-  data ? res.json(data) : res.status(404).json({ error: "No data" });
-});
-
 app.get("/api/prices", async (req, res) => {
   let symbols = req.query.symbols;
   if (!symbols) return res.status(400).json({ error: "Missing symbols" });
@@ -140,24 +117,10 @@ app.get("/api/prices", async (req, res) => {
   symbols = symbols.split(",").map(s => s.trim()).filter(Boolean);
   const results = {};
 
-  for (let i = 0; i < symbols.length; i += 5) {
-    const chunk = symbols.slice(i, i + 5);
-    const data = await Promise.all(chunk.map(fetchSingleStock));
-    data.forEach(d => d && (results[d.symbol] = d));
-  }
+  const data = await Promise.all(symbols.map(fetchSingleStock));
+  data.forEach(d => d && (results[d.symbol] = d));
 
-  res.json(results);
-});
-
-app.get("/api/stocks", (_, res) => {
-  const file = path.join(__dirname, "stocks.json");
-  res.json(JSON.parse(fs.readFileSync(file, "utf8")));
-});
-
-// =======================
-// 🔔 GLOBAL ALERT WATCHER
-// =======================
-async function checkAllAlerts() {
+  // 🔔 ALERT CHECK (THIS IS THE FIX)
   try {
     const users = await fdb.collection("users").get();
 
@@ -169,65 +132,39 @@ async function checkAllAlerts() {
         .where("triggered", "==", false)
         .get();
 
-      if (alertsSnap.empty) continue;
-
-      const alerts = alertsSnap.docs.map(d => ({
-        id: d.id,
-        ...d.data(),
-        uid: u.id
-      }));
-
-      const symbols = [...new Set(alerts.map(a => a.symbol))];
-
-      const prices = {};
-      for (let i = 0; i < symbols.length; i += 5) {
-        const chunk = symbols.slice(i, i + 5);
-        const data = await Promise.all(chunk.map(fetchSingleStock));
-        data.forEach(d => d && (prices[d.symbol] = d));
-      }
-
-      for (const a of alerts) {
-        const d = prices[a.symbol];
+      for (const docSnap of alertsSnap.docs) {
+        const a = docSnap.data();
+        const d = results[a.symbol];
         if (!d) continue;
 
         if (d.price >= a.price) {
-          console.log("🔥 ALERT TRIGGERED:", a.symbol, d.price);
-
-          await fetch(`http://localhost:${PORT}/api/alert`, {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({
-              email: a.email,
-              symbol: a.symbol,
-              target: a.price,
-              price: d.price,
-              change: d.change,
-              changePercent: d.changePercent
-            })
+          await sendAlertEmail({
+            email: a.email,
+            symbol: a.symbol,
+            target: a.price,
+            price: d.price,
+            change: d.change,
+            changePercent: d.changePercent
           });
 
-          await fdb
-            .collection("users")
-            .doc(a.uid)
-            .collection("alerts")
-            .doc(a.id)
-            .update({
-              triggered: true,
-              triggeredAt: admin.firestore.FieldValue.serverTimestamp()
-            });
+          await docSnap.ref.update({
+            triggered: true,
+            triggeredAt: admin.firestore.FieldValue.serverTimestamp()
+          });
         }
       }
     }
-  } catch (err) {
-    console.error("❌ Alert engine error:", err.message);
+  } catch (e) {
+    console.error("❌ Alert processing error:", e.message);
   }
-}
 
-// run every 30 sec
-setInterval(() => {
-  fetch(`http://localhost:${PORT}/api/health`).catch(() => {});
-}, 20000);
-setInterval(checkAllAlerts, 30000);
+  res.json(results);
+});
+
+app.get("/api/stocks", (_, res) => {
+  const file = path.join(__dirname, "stocks.json");
+  res.json(JSON.parse(fs.readFileSync(file, "utf8")));
+});
 
 // --------------------
 app.listen(PORT, HOST, () => {
