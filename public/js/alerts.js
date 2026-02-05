@@ -43,35 +43,12 @@ export function setupAlerts({
     });
 
     alertPrice.value = "";
-    await triggerAlertCheck();   // 🔥 FORCE CHECK
     loadAlerts();
   };
-
-  async function triggerAlertCheck() {
-    const uid = getUserId();
-    if (!uid) return;
-
-    // collect symbols from alerts
-    const snap = await getDocs(collection(db, "users", uid, "alerts"));
-    const symbols = [];
-
-    snap.forEach(d => {
-      const a = d.data();
-      if (!a.triggered) symbols.push(a.symbol);
-    });
-
-    if (!symbols.length) return;
-
-    // 🔔 THIS CALL IS CRITICAL
-    await fetch(`/api/prices?symbols=${symbols.join(",")}`);
-  }
 
   async function loadAlerts() {
     const uid = getUserId();
     if (!uid) return;
-
-    // 🔔 ENSURE CHECK RUNS WHEN TAB OPENS
-    await triggerAlertCheck();
 
     const snap = await getDocs(collection(db, "users", uid, "alerts"));
     alertList.innerHTML = "";
@@ -86,10 +63,12 @@ export function setupAlerts({
         <span>${a.triggered ? "Triggered" : "Pending"}</span>
         <button>✕</button>
       `;
+
       row.querySelector("button").onclick = async () => {
         await deleteDoc(doc(db, "users", uid, "alerts", d.id));
         loadAlerts();
       };
+
       alertList.appendChild(row);
     });
   }
