@@ -224,6 +224,9 @@ async function checkAllAlerts() {
 }
 
 // run every 30 sec
+setInterval(() => {
+  fetch(`http://localhost:${PORT}/api/health`).catch(() => {});
+}, 20000);
 setInterval(checkAllAlerts, 30000);
 
 // --------------------
