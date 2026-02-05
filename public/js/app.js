@@ -2,11 +2,16 @@ import { setupAuth } from "./auth.js";
 import { getAllStocks } from "./api.js";
 import { setupWatchlist } from "./watchlist.js";
 import { setupAlerts } from "./alerts.js";
+import { doc, getDoc } from "https://www.gstatic.com/firebasejs/12.8.0/firebase-firestore.js";
+import { db } from "./firebase.js";
 
 let userId = null;
 let watchlist = [];
+let alerts = null;
+
 window.currentUser = null;
 
+// ---------- DOM ----------
 const loginScreen = document.getElementById("loginScreen");
 const appScreen = document.getElementById("appScreen");
 
@@ -30,8 +35,6 @@ const tabAlerts = document.getElementById("tabAlerts");
 const watchTab = document.getElementById("watchTab");
 const alertsTab = document.getElementById("alertsTab");
 
-let alerts = null;
-
 // ---------- AUTH ----------
 setupAuth({
   loginBtn,
@@ -44,11 +47,24 @@ setupAuth({
     userId = user.uid;
     window.currentUser = user;
 
+    // show app
     loginScreen.style.display = "none";
     appScreen.style.display = "block";
 
+    // ✅ always start on Watchlist tab
+    tabWatch.classList.add("active");
+    tabAlerts.classList.remove("active");
+    watchTab.style.display = "block";
+    alertsTab.style.display = "none";
+
+    // load master stocks
     window.allStocks = await getAllStocks();
 
+    // ✅ load watchlist from Firestore
+    const snap = await getDoc(doc(db, "users", userId));
+    watchlist = snap.exists() ? snap.data().watchlist || [] : [];
+
+    // setup watchlist
     const wl = setupWatchlist({
       stockGrid,
       dropdown,
@@ -58,6 +74,7 @@ setupAuth({
       setWatchlist: v => (watchlist = v)
     });
 
+    // setup alerts (once per login)
     alerts = setupAlerts({
       alertSymbol,
       alertPrice,
@@ -72,17 +89,18 @@ setupAuth({
     alerts.loadAlerts();
   },
 
-onLogout: () => {
-  userId = null;
-  watchlist = [];
-  window.currentUser = null;
+  onLogout: () => {
+    userId = null;
+    watchlist = [];
+    alerts = null;
+    window.currentUser = null;
 
-  alertList.innerHTML = "";
-  alertSymbol.innerHTML = "";
+    alertList.innerHTML = "";
+    alertSymbol.innerHTML = "";
 
-  loginScreen.style.display = "flex";
-  appScreen.style.display = "none";
-}
+    loginScreen.style.display = "flex";
+    appScreen.style.display = "none";
+  }
 });
 
 // ---------- TAB SWITCH ----------
