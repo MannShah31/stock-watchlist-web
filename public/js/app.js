@@ -2,10 +2,13 @@ import { setupAuth } from "./auth.js";
 import { getAllStocks } from "./api.js";
 import { setupWatchlist } from "./watchlist.js";
 import { setupAlerts } from "./alerts.js";
-import { doc, getDoc } from "https://www.gstatic.com/firebasejs/12.8.0/firebase-firestore.js";
+import {
+  doc,
+  getDoc
+} from "https://www.gstatic.com/firebasejs/12.8.0/firebase-firestore.js";
 import { db } from "./firebase.js";
 
-/* ------------------ STATE ------------------ */
+/* ================== STATE ================== */
 let userId = null;
 let watchlist = [];
 let alerts = null;
@@ -13,7 +16,7 @@ let indicesInterval = null;
 
 window.currentUser = null;
 
-/* ------------------ DOM ------------------ */
+/* ================== DOM ================== */
 const loginScreen = document.getElementById("loginScreen");
 const appScreen = document.getElementById("appScreen");
 
@@ -44,7 +47,16 @@ const watchTab = document.getElementById("watchTab");
 const alertsTab = document.getElementById("alertsTab");
 const indicesTab = document.getElementById("indicesTab");
 
-/* ------------------ INDICES ------------------ */
+/* ================== HELPERS ================== */
+function pctClass(v) {
+  return v >= 0 ? "pos" : "neg";
+}
+
+function fmt(n) {
+  return n === null || n === undefined ? "-" : n.toFixed(2);
+}
+
+/* ================== INDICES ================== */
 async function loadIndices() {
   try {
     const res = await fetch("/api/indices");
@@ -54,27 +66,29 @@ async function loadIndices() {
 
     data.forEach(i => {
       const tr = document.createElement("tr");
+
       tr.innerHTML = `
-        <td>${i.name}</td>
-        <td>₹${i.current.toFixed(2)}</td>
-        <td class="${i.mom >= 0 ? "pos" : "neg"}">
-          ${i.mom.toFixed(2)}%
-        </td>
-        <td class="${i.yoy >= 0 ? "pos" : "neg"}">
-          ${i.yoy.toFixed(2)}%
-        </td>
+        <td><strong>${i.name}</strong></td>
+        <td>₹${fmt(i.oneYear)}</td>
+        <td>₹${fmt(i.oneMonth)}</td>
+        <td>₹${fmt(i.current)}</td>
+        <td>₹${fmt(i.high52)}</td>
+        <td>₹${fmt(i.low52)}</td>
+        <td class="${pctClass(i.mom)}">${fmt(i.mom)}%</td>
+        <td class="${pctClass(i.yoy)}">${fmt(i.yoy)}%</td>
       `;
+
       indicesTableBody.appendChild(tr);
     });
   } catch (e) {
-    console.error("Failed to load indices", e);
+    console.error("❌ Failed to load indices", e);
   }
 }
 
 function startIndicesAutoRefresh() {
   stopIndicesAutoRefresh();
   loadIndices();
-  indicesInterval = setInterval(loadIndices, 5 * 60 * 1000); // every 5 mins
+  indicesInterval = setInterval(loadIndices, 5 * 60 * 1000); // 5 min
 }
 
 function stopIndicesAutoRefresh() {
@@ -84,7 +98,7 @@ function stopIndicesAutoRefresh() {
   }
 }
 
-/* ------------------ AUTH ------------------ */
+/* ================== AUTH ================== */
 setupAuth({
   loginBtn,
   signupBtn,
@@ -99,7 +113,7 @@ setupAuth({
     loginScreen.style.display = "none";
     appScreen.style.display = "block";
 
-    // default tab
+    // default tab → Watchlist
     tabWatch.classList.add("active");
     tabAlerts.classList.remove("active");
     tabIndices.classList.remove("active");
@@ -108,7 +122,7 @@ setupAuth({
     alertsTab.style.display = "none";
     indicesTab.style.display = "none";
 
-    // load stocks
+    // load master stocks
     window.allStocks = await getAllStocks();
 
     // restore watchlist
@@ -155,7 +169,7 @@ setupAuth({
   }
 });
 
-/* ------------------ TAB SWITCHING ------------------ */
+/* ================== TAB SWITCHING ================== */
 tabWatch.onclick = () => {
   stopIndicesAutoRefresh();
 
