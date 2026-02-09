@@ -1,14 +1,15 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-<meta charset="UTF-8">
-<title>Stock Watchlist</title>
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-<link rel="stylesheet" href="/css/app.css">
+  <meta charset="UTF-8">
+  <title>Stock Watchlist</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <link rel="stylesheet" href="/css/app.css">
 </head>
 
 <body>
 
+<!-- ================= LOGIN ================= -->
 <div id="loginScreen" class="login-wrap">
   <div class="login-card">
     <h2 style="margin-bottom:6px">📈 Stock Watchlist</h2>
@@ -24,8 +25,9 @@
   </div>
 </div>
 
-
+<!-- ================= APP ================= -->
 <div id="appScreen" style="display:none">
+
 <header>
   <div>
     <strong>📈 Stock Watchlist</strong>
@@ -33,7 +35,6 @@
       <button id="tabWatch" class="active">Watchlist</button>
       <button id="tabAlerts">Alerts</button>
       <button id="tabIndices">Indices</button>
-
     </nav>
   </div>
   <button id="logoutBtn">Logout</button>
@@ -41,65 +42,76 @@
 
 <div class="app-wrap">
 
-<div id="watchTab">
-  <div class="search-card">
-    <input id="search" class="search-input" placeholder="Search stock...">
-    <div id="dropdown" class="dropdown"></div>
-  </div>
-<div class="table-wrap">
-  <table class="watchlist-table">
-    <thead>
-      <tr>
-        <th>Stock</th>
-        <th>Price</th>
-        <th>%</th>
-        <th>Volume</th>
-        <th>52W High</th>
-        <th>52W Low</th>
-        <th></th>
-      </tr>
-    </thead>
-    <tbody id="stockTableBody"></tbody>
-  </table>
-</div>
-</div>
-
-<div id="alertsTab" style="display:none">
-  <div class="alert-card">
-    <h3>🔔 Price Alerts</h3>
-
-    <div style="display:flex;gap:10px;margin-bottom:14px">
-      <select id="alertSymbol" style="flex:1;padding:10px"></select>
-      <input id="alertPrice" type="number" placeholder="Target Price" style="flex:1;padding:10px">
-      <button id="addAlertBtn">Add</button>
+  <!-- ========== WATCHLIST TAB ========== -->
+  <div id="watchTab">
+    <div class="search-card">
+      <input id="search" class="search-input" placeholder="Search stock...">
+      <div id="dropdown" class="dropdown"></div>
     </div>
 
-    <div id="alertList"></div>
+    <div class="table-wrap">
+      <table class="watchlist-table">
+        <thead>
+          <tr>
+            <th>Stock</th>
+            <th>Price</th>
+            <th>%</th>
+            <th>Volume</th>
+            <th>52W High</th>
+            <th>52W Low</th>
+            <th></th>
+          </tr>
+        </thead>
+        <tbody id="stockTableBody"></tbody>
+      </table>
+    </div>
   </div>
-</div>
-<div id="indicesTab" style="display:none">
-  <div class="table-wrap">
-    <table class="watchlist-table">
-      <thead>
-        <tr>
-          <th>Index</th>
-          <th>Current</th>
-          <th>MoM %</th>
-          <th>YoY %</th>
-        </tr>
-      </thead>
-      <tbody id="indicesTableBody"></tbody>
-    </table>
+
+  <!-- ========== ALERTS TAB ========== -->
+  <div id="alertsTab" style="display:none">
+    <div class="alert-card">
+      <h3>🔔 Price Alerts</h3>
+
+      <div style="display:flex;gap:10px;margin-bottom:14px">
+        <select id="alertSymbol" style="flex:1;padding:10px"></select>
+        <input id="alertPrice" type="number" placeholder="Target Price" style="flex:1;padding:10px">
+        <button id="addAlertBtn">Add</button>
+      </div>
+
+      <div id="alertList"></div>
+    </div>
   </div>
-</div>
+
+  <!-- ========== INDICES TAB ========== -->
+  <div id="indicesTab" style="display:none">
+    <div class="alert-card">
+      <h3>📊 Market Indices</h3>
+
+      <div class="table-wrap">
+        <table class="watchlist-table">
+          <thead>
+            <tr>
+              <th>Index</th>
+              <th>Current</th>
+              <th>MoM %</th>
+              <th>YoY %</th>
+            </tr>
+          </thead>
+          <tbody id="indicesTableBody"></tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
 </div>
 </div>
 
-<!-- EMAILJS -->
+<!-- ================= EMAILJS ================= -->
 <script src="https://cdn.jsdelivr.net/npm/emailjs-com@3/dist/email.min.js"></script>
 <script>
   emailjs.init("-nPbEj5p827UiuqEA");
 </script>
+
 <script type="module" src="/js/app.js"></script>
 </body>
 </html>
