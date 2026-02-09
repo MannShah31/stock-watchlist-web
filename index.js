@@ -227,6 +227,7 @@ app.get("/api/stocks", (_, res) => {
 // --------------------
 // 📊 Indices API
 // --------------------
+
 app.get("/api/indices", async (_, res) => {
   try {
     const results = [];
