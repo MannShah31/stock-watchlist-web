@@ -153,3 +153,55 @@ button{
   background:#020617;
   color:white;
 }
+.table-wrap {
+  overflow-x: auto;
+}
+
+.watchlist-table {
+  width: 100%;
+  border-collapse: collapse;
+  margin-top: 16px;
+  background: rgba(2, 6, 23, 0.6);
+  border-radius: 12px;
+  overflow: hidden;
+}
+
+.watchlist-table th,
+.watchlist-table td {
+  padding: 14px 12px;
+  text-align: left;
+  font-size: 14px;
+}
+
+.watchlist-table thead {
+  background: rgba(30, 58, 138, 0.4);
+}
+
+.watchlist-table tbody tr {
+  border-bottom: 1px solid rgba(255,255,255,0.05);
+}
+
+.watchlist-table tbody tr:hover {
+  background: rgba(255,255,255,0.03);
+}
+
+.watchlist-table .pos {
+  color: #22c55e;
+}
+
+.watchlist-table .neg {
+  color: #ef4444;
+}
+
+.remove-btn {
+  background: #3b82f6;
+  border: none;
+  color: white;
+  border-radius: 6px;
+  padding: 6px 10px;
+  cursor: pointer;
+}
+
+.remove-btn:hover {
+  opacity: 0.85;
+}

@@ -1,75 +1,100 @@
-import { doc, setDoc } from "https://www.gstatic.com/firebasejs/12.8.0/firebase-firestore.js";
+import {
+  doc,
+  setDoc
+} from "https://www.gstatic.com/firebasejs/12.8.0/firebase-firestore.js";
 import { db } from "./firebase.js";
 import { getPrices } from "./api.js";
 
-export function setupWatchlist({ stockGrid, dropdown, search, getUserId, getWatchlist, setWatchlist }) {
+export function setupWatchlist({
+  stockGrid, // no longer used but kept for compatibility
+  dropdown,
+  search,
+  getUserId,
+  getWatchlist,
+  setWatchlist
+}) {
 
-  let activeIndex = -1;
+  const tableBody = document.getElementById("stockTableBody");
 
   search.addEventListener("input", e => {
     const q = e.target.value.toLowerCase().trim();
     dropdown.innerHTML = "";
-    activeIndex = -1;
     if (!q) return;
 
-    window.allStocks.filter(s =>
-      s.name.toLowerCase().includes(q) ||
-      s.symbol.toLowerCase().includes(q) ||
-      (s.sector && s.sector.toLowerCase().includes(q))
-    ).slice(0, 12).forEach(s => {
-      const d = document.createElement("div");
-      d.className = "option";
-      d.textContent = `${s.name} (${s.symbol})`;
-      d.onclick = () => addStock(s);
-      dropdown.appendChild(d);
-    });
+    window.allStocks
+      .filter(s =>
+        s.name.toLowerCase().includes(q) ||
+        s.symbol.toLowerCase().includes(q)
+      )
+      .slice(0, 10)
+      .forEach(s => {
+        const d = document.createElement("div");
+        d.className = "option";
+        d.textContent = `${s.name} (${s.symbol})`;
+        d.onclick = () => addStock(s);
+        dropdown.appendChild(d);
+      });
   });
 
-  async function addStock(s){
+  async function addStock(s) {
     let list = getWatchlist();
-    if(list.find(x=>x.symbol===s.symbol)) return;
+    if (list.find(x => x.symbol === s.symbol)) return;
+
     list.push(s);
-    await setDoc(doc(db,"users",getUserId()),{watchlist:list},{merge:true});
+    await setDoc(doc(db, "users", getUserId()), { watchlist: list }, { merge: true });
     setWatchlist(list);
-    dropdown.innerHTML=""; search.value="";
+    dropdown.innerHTML = "";
+    search.value = "";
     render();
   }
 
-  async function render(){
+  async function render() {
     const list = getWatchlist();
-    if(!list.length){
-      stockGrid.innerHTML = `<p style="opacity:.5">Add stocks to your watchlist</p>`;
+    tableBody.innerHTML = "";
+
+    if (!list.length) {
+      tableBody.innerHTML = `
+        <tr>
+          <td colspan="7" style="opacity:.5">Add stocks to your watchlist</td>
+        </tr>`;
       return;
     }
 
-    const data = await getPrices(list.map(s=>s.symbol));
-    stockGrid.innerHTML = "";
+    const data = await getPrices(list.map(s => s.symbol));
 
     list.forEach(s => {
       const d = data[s.symbol];
-      if(!d) return;
+      if (!d) return;
 
-      const div = document.createElement("div");
-      div.className = `stock-card ${d.change >= 0 ? "pos" : "neg"}`;
-
-      div.innerHTML = `
-        <div style="display:flex;justify-content:space-between">
-          <strong>${s.name}</strong>
-          <button onclick="window.removeStock('${s.symbol}')">✕</button>
-        </div>
-        <div class="price">₹${d.price.toFixed(2)}</div>
-        <div class="${d.change>=0?'green':'red'}">${d.changePercent.toFixed(2)}%</div>
+      const tr = document.createElement("tr");
+      tr.innerHTML = `
+        <td>${s.name}</td>
+        <td>₹${d.price.toFixed(2)}</td>
+        <td class="${d.change >= 0 ? "pos" : "neg"}">
+          ${d.changePercent.toFixed(2)}%
+        </td>
+        <td>${d.volume.toLocaleString()}</td>
+        <td>${d.high52}</td>
+        <td>${d.low52}</td>
+        <td>
+          <button class="remove-btn" data-sym="${s.symbol}">✕</button>
+        </td>
       `;
-      stockGrid.appendChild(div);
+
+      tr.querySelector(".remove-btn").onclick = async () => {
+        let updated = getWatchlist().filter(x => x.symbol !== s.symbol);
+        await setDoc(
+          doc(db, "users", getUserId()),
+          { watchlist: updated },
+          { merge: true }
+        );
+        setWatchlist(updated);
+        render();
+      };
+
+      tableBody.appendChild(tr);
     });
   }
-
-  window.removeStock = async sym => {
-    let list = getWatchlist().filter(s=>s.symbol!==sym);
-    await setDoc(doc(db,"users",getUserId()),{watchlist:list},{merge:true});
-    setWatchlist(list);
-    render();
-  };
 
   return { render };
 }
