@@ -5,6 +5,7 @@ body{
   color:#e5e7eb;
 }
 
+/* ================= HEADER FIX ================= */
 header{
   background:linear-gradient(90deg,#020617,#020617);
   color:#fff;
@@ -13,7 +14,22 @@ header{
   justify-content:space-between;
   align-items:center;
   border-bottom:1px solid #1f2a44;
+
+  /* 🔥 CRITICAL FIX */
+  position: relative;
+  z-index: 100;
 }
+
+header nav{
+  pointer-events: auto;
+}
+
+header nav button{
+  pointer-events: auto;
+  position: relative;
+  z-index: 101;
+}
+/* ================= END FIX ================= */
 
 nav button{
   background:#111a2e;
@@ -84,7 +100,7 @@ button{
     inset 0 0 0 1px #1f2a44,
     0 0 18px rgba(34,197,94,.25);
 }
-.stock-card.neg {
+.stock-card.neg{
   box-shadow:
     0 10px 40px rgba(0,0,0,.6),
     inset 0 0 0 1px #1f2a44,
@@ -118,15 +134,18 @@ button{
   font-weight:600;
   font-size:13px;
 }
+
 .stock-grid{
   margin-top:24px;
   display:grid;
   grid-template-columns:repeat(auto-fill,minmax(320px,1fr));
   gap:20px;
 }
+
 .compact .stock-card{padding:12px}
 .compact .price{font-size:20px}
 .compact .stock-grid{grid-template-columns:repeat(auto-fill,minmax(260px,1fr))}
+
 .login-wrap{
   height:100vh;
   display:flex;
@@ -153,55 +172,49 @@ button{
   background:#020617;
   color:white;
 }
-.table-wrap {
-  overflow-x: auto;
+
+.table-wrap{
+  overflow-x:auto;
 }
 
-.watchlist-table {
-  width: 100%;
-  border-collapse: collapse;
-  margin-top: 16px;
-  background: rgba(2, 6, 23, 0.6);
-  border-radius: 12px;
-  overflow: hidden;
+.watchlist-table{
+  width:100%;
+  border-collapse:collapse;
+  margin-top:16px;
+  background:rgba(2,6,23,.6);
+  border-radius:12px;
+  overflow:hidden;
 }
 
 .watchlist-table th,
-.watchlist-table td {
-  padding: 14px 12px;
-  text-align: left;
-  font-size: 14px;
+.watchlist-table td{
+  padding:14px 12px;
+  text-align:left;
+  font-size:14px;
 }
 
-.watchlist-table thead {
-  background: rgba(30, 58, 138, 0.4);
+.watchlist-table thead{
+  background:rgba(30,58,138,.4);
 }
 
-.watchlist-table tbody tr {
-  border-bottom: 1px solid rgba(255,255,255,0.05);
+.watchlist-table tbody tr{
+  border-bottom:1px solid rgba(255,255,255,.05);
 }
 
-.watchlist-table tbody tr:hover {
-  background: rgba(255,255,255,0.03);
+.watchlist-table tbody tr:hover{
+  background:rgba(255,255,255,.03);
 }
 
-.watchlist-table .pos {
-  color: #22c55e;
+.watchlist-table .pos{color:#22c55e}
+.watchlist-table .neg{color:#ef4444}
+
+.remove-btn{
+  background:#3b82f6;
+  border:none;
+  color:white;
+  border-radius:6px;
+  padding:6px 10px;
+  cursor:pointer;
 }
 
-.watchlist-table .neg {
-  color: #ef4444;
-}
-
-.remove-btn {
-  background: #3b82f6;
-  border: none;
-  color: white;
-  border-radius: 6px;
-  padding: 6px 10px;
-  cursor: pointer;
-}
-
-.remove-btn:hover {
-  opacity: 0.85;
-}
+.remove-btn:hover{opacity:.85}
