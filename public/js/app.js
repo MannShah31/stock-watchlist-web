@@ -66,38 +66,26 @@ async function loadIndices() {
 
     data.forEach(i => {
       const tr = document.createElement("tr");
-
       tr.innerHTML = `
-        <td><strong>${i.name}</strong></td>
-        <td>₹${fmt(i.oneYear)}</td>
-        <td>₹${fmt(i.oneMonth)}</td>
-        <td>₹${fmt(i.current)}</td>
-        <td>₹${fmt(i.high52)}</td>
-        <td>₹${fmt(i.low52)}</td>
-        <td class="${pctClass(i.mom)}">${fmt(i.mom)}%</td>
-        <td class="${pctClass(i.yoy)}">${fmt(i.yoy)}%</td>
+        <td>${i.name}</td>
+        <td>₹${i.twoYearAgo?.toFixed(2) || "-"}</td>
+        <td>₹${i.oneYearAgo?.toFixed(2) || "-"}</td>
+        <td>₹${i.current.toFixed(2)}</td>
+        <td>₹${i.high52.toFixed(2)}</td>
+        <td>₹${i.low52.toFixed(2)}</td>
+        <td class="${i.mom >= 0 ? "pos" : "neg"}">
+          ${i.mom.toFixed(2)}%
+        </td>
+        <td class="${i.yoy >= 0 ? "pos" : "neg"}">
+          ${i.yoy.toFixed(2)}%
+        </td>
       `;
-
       indicesTableBody.appendChild(tr);
     });
   } catch (e) {
-    console.error("❌ Failed to load indices", e);
+    console.error("Failed to load indices", e);
   }
 }
-
-function startIndicesAutoRefresh() {
-  stopIndicesAutoRefresh();
-  loadIndices();
-  indicesInterval = setInterval(loadIndices, 5 * 60 * 1000); // 5 min
-}
-
-function stopIndicesAutoRefresh() {
-  if (indicesInterval) {
-    clearInterval(indicesInterval);
-    indicesInterval = null;
-  }
-}
-
 /* ================== AUTH ================== */
 setupAuth({
   loginBtn,
