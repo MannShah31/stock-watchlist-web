@@ -5,13 +5,14 @@ import { setupAlerts } from "./alerts.js";
 import { doc, getDoc } from "https://www.gstatic.com/firebasejs/12.8.0/firebase-firestore.js";
 import { db } from "./firebase.js";
 
+/* ------------------ STATE ------------------ */
 let userId = null;
 let watchlist = [];
 let alerts = null;
 
 window.currentUser = null;
 
-// ---------- DOM ----------
+/* ------------------ DOM ------------------ */
 const loginScreen = document.getElementById("loginScreen");
 const appScreen = document.getElementById("appScreen");
 
@@ -19,6 +20,7 @@ const loginBtn = document.getElementById("loginBtn");
 const signupBtn = document.getElementById("signupBtn");
 const logoutBtn = document.getElementById("logoutBtn");
 
+// watchlist UI
 const stockGrid = document.getElementById("stockGrid");
 const dropdown = document.getElementById("dropdown");
 const search = document.getElementById("search");
@@ -35,7 +37,7 @@ const tabAlerts = document.getElementById("tabAlerts");
 const watchTab = document.getElementById("watchTab");
 const alertsTab = document.getElementById("alertsTab");
 
-// ---------- AUTH ----------
+/* ------------------ AUTH ------------------ */
 setupAuth({
   loginBtn,
   signupBtn,
@@ -51,20 +53,20 @@ setupAuth({
     loginScreen.style.display = "none";
     appScreen.style.display = "block";
 
-    // ✅ always start on Watchlist tab
+    // ✅ ALWAYS open Watchlist tab on login
     tabWatch.classList.add("active");
     tabAlerts.classList.remove("active");
     watchTab.style.display = "block";
     alertsTab.style.display = "none";
 
-    // load master stocks
+    // load all stocks master list
     window.allStocks = await getAllStocks();
 
-    // ✅ load watchlist from Firestore
+    // ✅ restore watchlist from Firestore
     const snap = await getDoc(doc(db, "users", userId));
     watchlist = snap.exists() ? snap.data().watchlist || [] : [];
 
-    // setup watchlist
+    // setup watchlist module
     const wl = setupWatchlist({
       stockGrid,
       dropdown,
@@ -74,7 +76,7 @@ setupAuth({
       setWatchlist: v => (watchlist = v)
     });
 
-    // setup alerts (once per login)
+    // setup alerts module (ONCE per login)
     alerts = setupAlerts({
       alertSymbol,
       alertPrice,
@@ -84,6 +86,7 @@ setupAuth({
       getWatchlist: () => watchlist
     });
 
+    // initial renders
     wl.render();
     alerts.populateDropdown();
     alerts.loadAlerts();
@@ -95,6 +98,7 @@ setupAuth({
     alerts = null;
     window.currentUser = null;
 
+    // cleanup UI
     alertList.innerHTML = "";
     alertSymbol.innerHTML = "";
 
@@ -103,10 +107,11 @@ setupAuth({
   }
 });
 
-// ---------- TAB SWITCH ----------
+/* ------------------ TAB SWITCHING ------------------ */
 tabWatch.onclick = () => {
   tabWatch.classList.add("active");
   tabAlerts.classList.remove("active");
+
   watchTab.style.display = "block";
   alertsTab.style.display = "none";
 };
@@ -114,9 +119,11 @@ tabWatch.onclick = () => {
 tabAlerts.onclick = () => {
   tabAlerts.classList.add("active");
   tabWatch.classList.remove("active");
+
   watchTab.style.display = "none";
   alertsTab.style.display = "block";
 
+  // refresh alerts view when opened
   if (alerts) {
     alerts.populateDropdown();
     alerts.loadAlerts();
