@@ -40,6 +40,65 @@ if (!EMAILJS_SERVICE || !EMAILJS_TEMPLATE || !EMAILJS_PUBLIC) {
 // --------------------
 // Health
 // --------------------
+// =======================
+// 📊 INDICES API
+// =======================
+const INDICES = {
+  "NIFTY 50": "^NSEI",
+  "NIFTY BANK": "^NSEBANK",
+  "NIFTY IT": "^CNXIT",
+  "NIFTY FMCG": "^CNXFMCG",
+  "NIFTY PHARMA": "^CNXPHARMA",
+  "NIFTY AUTO": "^CNXAUTO",
+  "NIFTY METAL": "^CNXMETAL",
+  "NIFTY ENERGY": "^CNXENERGY",
+  "SENSEX": "^BSESN"
+};
+
+async function fetchIndex(symbol) {
+  return new Promise(resolve => {
+    const url = `https://query1.finance.yahoo.com/v8/finance/chart/${symbol}?range=1y&interval=1d`;
+
+    https.get(url, { headers: { "User-Agent": "Mozilla/5.0" } }, r => {
+      let raw = "";
+      r.on("data", d => (raw += d));
+      r.on("end", () => {
+        try {
+          const res = JSON.parse(raw).chart.result[0];
+          const prices = res.indicators.quote[0].close.filter(Boolean);
+
+          const latest = prices[prices.length - 1];
+          const oneMonthAgo = prices[Math.max(0, prices.length - 22)];
+          const oneYearAgo = prices[0];
+
+          resolve({
+            current: latest,
+            mom: ((latest - oneMonthAgo) / oneMonthAgo) * 100,
+            yoy: ((latest - oneYearAgo) / oneYearAgo) * 100
+          });
+        } catch {
+          resolve(null);
+        }
+      });
+    });
+  });
+}
+
+app.get("/api/indices", async (_, res) => {
+  const output = [];
+
+  for (const name in INDICES) {
+    const data = await fetchIndex(INDICES[name]);
+    if (data) {
+      output.push({
+        name,
+        ...data
+      });
+    }
+  }
+
+  res.json(output);
+});
 app.get("/api/health", (_, res) => res.json({ status: "ok" }));
 
 // --------------------
