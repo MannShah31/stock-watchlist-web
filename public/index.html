@@ -32,6 +32,8 @@
     <nav>
       <button id="tabWatch" class="active">Watchlist</button>
       <button id="tabAlerts">Alerts</button>
+      <button id="tabIndices">Indices</button>
+
     </nav>
   </div>
   <button id="logoutBtn">Logout</button>
@@ -75,7 +77,21 @@
     <div id="alertList"></div>
   </div>
 </div>
-
+<div id="indicesTab" style="display:none">
+  <div class="table-wrap">
+    <table class="watchlist-table">
+      <thead>
+        <tr>
+          <th>Index</th>
+          <th>Current</th>
+          <th>MoM %</th>
+          <th>YoY %</th>
+        </tr>
+      </thead>
+      <tbody id="indicesTableBody"></tbody>
+    </table>
+  </div>
+</div>
 </div>
 </div>
 
