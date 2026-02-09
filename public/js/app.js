@@ -9,6 +9,7 @@ import { db } from "./firebase.js";
 let userId = null;
 let watchlist = [];
 let alerts = null;
+let indicesInterval = null;
 
 window.currentUser = null;
 
@@ -31,6 +32,9 @@ const alertPrice = document.getElementById("alertPrice");
 const addAlertBtn = document.getElementById("addAlertBtn");
 const alertList = document.getElementById("alertList");
 
+// indices UI
+const indicesTableBody = document.getElementById("indicesTableBody");
+
 // tabs
 const tabWatch = document.getElementById("tabWatch");
 const tabAlerts = document.getElementById("tabAlerts");
@@ -39,6 +43,46 @@ const tabIndices = document.getElementById("tabIndices");
 const watchTab = document.getElementById("watchTab");
 const alertsTab = document.getElementById("alertsTab");
 const indicesTab = document.getElementById("indicesTab");
+
+/* ------------------ INDICES ------------------ */
+async function loadIndices() {
+  try {
+    const res = await fetch("/api/indices");
+    const data = await res.json();
+
+    indicesTableBody.innerHTML = "";
+
+    data.forEach(i => {
+      const tr = document.createElement("tr");
+      tr.innerHTML = `
+        <td>${i.name}</td>
+        <td>₹${i.current.toFixed(2)}</td>
+        <td class="${i.mom >= 0 ? "pos" : "neg"}">
+          ${i.mom.toFixed(2)}%
+        </td>
+        <td class="${i.yoy >= 0 ? "pos" : "neg"}">
+          ${i.yoy.toFixed(2)}%
+        </td>
+      `;
+      indicesTableBody.appendChild(tr);
+    });
+  } catch (e) {
+    console.error("Failed to load indices", e);
+  }
+}
+
+function startIndicesAutoRefresh() {
+  stopIndicesAutoRefresh();
+  loadIndices();
+  indicesInterval = setInterval(loadIndices, 5 * 60 * 1000); // every 5 mins
+}
+
+function stopIndicesAutoRefresh() {
+  if (indicesInterval) {
+    clearInterval(indicesInterval);
+    indicesInterval = null;
+  }
+}
 
 /* ------------------ AUTH ------------------ */
 setupAuth({
@@ -55,7 +99,7 @@ setupAuth({
     loginScreen.style.display = "none";
     appScreen.style.display = "block";
 
-    // ✅ ALWAYS start on Watchlist
+    // default tab
     tabWatch.classList.add("active");
     tabAlerts.classList.remove("active");
     tabIndices.classList.remove("active");
@@ -100,8 +144,11 @@ setupAuth({
     alerts = null;
     window.currentUser = null;
 
+    stopIndicesAutoRefresh();
+
     alertList.innerHTML = "";
     alertSymbol.innerHTML = "";
+    indicesTableBody.innerHTML = "";
 
     loginScreen.style.display = "flex";
     appScreen.style.display = "none";
@@ -110,6 +157,8 @@ setupAuth({
 
 /* ------------------ TAB SWITCHING ------------------ */
 tabWatch.onclick = () => {
+  stopIndicesAutoRefresh();
+
   tabWatch.classList.add("active");
   tabAlerts.classList.remove("active");
   tabIndices.classList.remove("active");
@@ -120,6 +169,8 @@ tabWatch.onclick = () => {
 };
 
 tabAlerts.onclick = () => {
+  stopIndicesAutoRefresh();
+
   tabAlerts.classList.add("active");
   tabWatch.classList.remove("active");
   tabIndices.classList.remove("active");
@@ -142,4 +193,6 @@ tabIndices.onclick = () => {
   watchTab.style.display = "none";
   alertsTab.style.display = "none";
   indicesTab.style.display = "block";
+
+  startIndicesAutoRefresh();
 };
