@@ -165,6 +165,59 @@ app.get("/api/stocks", (_, res) => {
   const file = path.join(__dirname, "stocks.json");
   res.json(JSON.parse(fs.readFileSync(file, "utf8")));
 });
+// --------------------
+// 📊 Indices API
+// --------------------
+app.get("/api/indices", async (_, res) => {
+  try {
+    const results = [];
+
+    for (const [name, symbol] of Object.entries(INDICES)) {
+      const url = `https://query1.finance.yahoo.com/v8/finance/chart/${encodeURIComponent(
+        symbol
+      )}?range=1y&interval=1d`;
+
+      const data = await new Promise(resolve => {
+        https.get(url, { headers: { "User-Agent": "Mozilla/5.0" } }, r => {
+          let raw = "";
+          r.on("data", d => (raw += d));
+          r.on("end", () => {
+            try {
+              const chart = JSON.parse(raw).chart.result[0];
+              const closes = chart.indicators.quote[0].close.filter(Boolean);
+              const timestamps = chart.timestamp;
+
+              const current = closes.at(-1);
+              const oneMonth = closes[Math.max(0, closes.length - 22)];
+              const oneYear = closes[0];
+
+              resolve({
+                name,
+                symbol,
+                current,
+                oneMonth,
+                oneYear,
+                mom:
+                  ((current - oneMonth) / oneMonth) * 100,
+                yoy:
+                  ((current - oneYear) / oneYear) * 100
+              });
+            } catch {
+              resolve(null);
+            }
+          });
+        }).on("error", () => resolve(null));
+      });
+
+      if (data) results.push(data);
+    }
+
+    res.json(results);
+  } catch (e) {
+    console.error("❌ Indices API error", e.message);
+    res.status(500).json({ error: "Failed to load indices" });
+  }
+});
 
 // --------------------
 app.listen(PORT, HOST, () => {
