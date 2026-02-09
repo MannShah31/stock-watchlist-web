@@ -34,8 +34,11 @@ const alertList = document.getElementById("alertList");
 // tabs
 const tabWatch = document.getElementById("tabWatch");
 const tabAlerts = document.getElementById("tabAlerts");
+const tabIndices = document.getElementById("tabIndices");
+
 const watchTab = document.getElementById("watchTab");
 const alertsTab = document.getElementById("alertsTab");
+const indicesTab = document.getElementById("indicesTab");
 
 /* ------------------ AUTH ------------------ */
 setupAuth({
@@ -49,24 +52,25 @@ setupAuth({
     userId = user.uid;
     window.currentUser = user;
 
-    // show app
     loginScreen.style.display = "none";
     appScreen.style.display = "block";
 
-    // ✅ ALWAYS open Watchlist tab on login
+    // ✅ ALWAYS start on Watchlist
     tabWatch.classList.add("active");
     tabAlerts.classList.remove("active");
+    tabIndices.classList.remove("active");
+
     watchTab.style.display = "block";
     alertsTab.style.display = "none";
+    indicesTab.style.display = "none";
 
-    // load all stocks master list
+    // load stocks
     window.allStocks = await getAllStocks();
 
-    // ✅ restore watchlist from Firestore
+    // restore watchlist
     const snap = await getDoc(doc(db, "users", userId));
     watchlist = snap.exists() ? snap.data().watchlist || [] : [];
 
-    // setup watchlist module
     const wl = setupWatchlist({
       stockGrid,
       dropdown,
@@ -76,7 +80,6 @@ setupAuth({
       setWatchlist: v => (watchlist = v)
     });
 
-    // setup alerts module (ONCE per login)
     alerts = setupAlerts({
       alertSymbol,
       alertPrice,
@@ -86,7 +89,6 @@ setupAuth({
       getWatchlist: () => watchlist
     });
 
-    // initial renders
     wl.render();
     alerts.populateDropdown();
     alerts.loadAlerts();
@@ -98,7 +100,6 @@ setupAuth({
     alerts = null;
     window.currentUser = null;
 
-    // cleanup UI
     alertList.innerHTML = "";
     alertSymbol.innerHTML = "";
 
@@ -111,21 +112,34 @@ setupAuth({
 tabWatch.onclick = () => {
   tabWatch.classList.add("active");
   tabAlerts.classList.remove("active");
+  tabIndices.classList.remove("active");
 
   watchTab.style.display = "block";
   alertsTab.style.display = "none";
+  indicesTab.style.display = "none";
 };
 
 tabAlerts.onclick = () => {
   tabAlerts.classList.add("active");
   tabWatch.classList.remove("active");
+  tabIndices.classList.remove("active");
 
   watchTab.style.display = "none";
   alertsTab.style.display = "block";
+  indicesTab.style.display = "none";
 
-  // refresh alerts view when opened
   if (alerts) {
     alerts.populateDropdown();
     alerts.loadAlerts();
   }
+};
+
+tabIndices.onclick = () => {
+  tabIndices.classList.add("active");
+  tabWatch.classList.remove("active");
+  tabAlerts.classList.remove("active");
+
+  watchTab.style.display = "none";
+  alertsTab.style.display = "none";
+  indicesTab.style.display = "block";
 };
