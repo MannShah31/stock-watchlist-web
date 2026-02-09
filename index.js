@@ -71,21 +71,23 @@ function fetchIndexHistory(symbol) {
           const chart = JSON.parse(raw).chart.result[0];
           const closes = chart.indicators.quote[0].close.filter(Boolean);
 
-          const current = closes.at(-1);
-          const oneMonth = closes[Math.max(0, closes.length - 22)];
-          const oneYear = closes[Math.max(0, closes.length - 252)];
-          const twoYear = closes[0];
+          if (closes.length < 260) return resolve(null);
 
-          const last52w = closes.slice(-252);
+          const current = closes.at(-1);
+          const oneMonthAgo = closes.at(-22);
+          const oneYearAgo = closes.at(-252);
+          const twoYearAgo = closes[0];
+
+          const last52Weeks = closes.slice(-252);
 
           resolve({
             current,
-            oneYear,
-            twoYear,
-            high52: Math.max(...last52w),
-            low52: Math.min(...last52w),
-            mom: ((current - oneMonth) / oneMonth) * 100,
-            yoy: ((current - oneYear) / oneYear) * 100
+            oneYearAgo,
+            twoYearAgo,
+            high52: Math.max(...last52Weeks),
+            low52: Math.min(...last52Weeks),
+            mom: ((current - oneMonthAgo) / oneMonthAgo) * 100,
+            yoy: ((current - oneYearAgo) / oneYearAgo) * 100
           });
         } catch {
           resolve(null);
@@ -104,7 +106,12 @@ app.get("/api/indices", async (_, res) => {
 
     for (const [name, symbol] of Object.entries(INDICES)) {
       const data = await fetchIndexHistory(symbol);
-      if (data) results.push({ name, ...data });
+      if (data) {
+        results.push({
+          name,
+          ...data
+        });
+      }
     }
 
     res.json(results);
