@@ -5,7 +5,7 @@ body{
   color:#e5e7eb;
 }
 
-/* ================= HEADER FIX ================= */
+/* ================= HEADER (FIXED & CLICKABLE) ================= */
 header{
   background:linear-gradient(90deg,#020617,#020617);
   color:#fff;
@@ -15,9 +15,8 @@ header{
   align-items:center;
   border-bottom:1px solid #1f2a44;
 
-  /* 🔥 CRITICAL FIX */
   position: relative;
-  z-index: 100;
+  z-index: 1000; /* 🔥 MUST BE ABOVE ALL CONTENT */
 }
 
 header nav{
@@ -27,10 +26,25 @@ header nav{
 header nav button{
   pointer-events: auto;
   position: relative;
-  z-index: 101;
+  z-index: 1001;
 }
-/* ================= END FIX ================= */
 
+/* ================= APP LAYOUT ================= */
+.app-wrap{
+  position: relative;
+  z-index: 1; /* 🔥 BELOW HEADER */
+}
+
+/* Ensure tab panels never overlay header */
+#watchTab,
+#alertsTab,
+#indicesTab{
+  position: relative;
+  z-index: 1;
+  pointer-events: auto;
+}
+
+/* ================= NAV BUTTONS ================= */
 nav button{
   background:#111a2e;
   border:none;
@@ -49,6 +63,7 @@ nav button.active{
   box-shadow:0 0 12px rgba(59,130,246,.6);
 }
 
+/* ================= BUTTONS ================= */
 button{
   background:#3b82f6;
   color:white;
@@ -58,6 +73,7 @@ button{
   cursor:pointer;
 }
 
+/* ================= CARDS ================= */
 .search-card,
 .alert-card{
   background:#0f172a;
@@ -84,6 +100,7 @@ button{
   background:#111a2e;
 }
 
+/* ================= STOCK CARDS ================= */
 .stock-card{
   background:linear-gradient(145deg,#0b1228,#070f24);
   border-radius:16px;
@@ -100,12 +117,14 @@ button{
     inset 0 0 0 1px #1f2a44,
     0 0 18px rgba(34,197,94,.25);
 }
+
 .stock-card.neg{
   box-shadow:
     0 10px 40px rgba(0,0,0,.6),
     inset 0 0 0 1px #1f2a44,
     0 0 18px rgba(239,68,68,.25);
 }
+
 .stock-card:hover{
   transform:translateY(-4px);
   box-shadow:
@@ -117,6 +136,7 @@ button{
 .green{color:#22c55e}
 .red{color:#ef4444}
 
+/* ================= ALERTS ================= */
 .alert-row{
   display:grid;
   grid-template-columns:1fr 1fr 1fr 2fr 2fr 50px;
@@ -135,6 +155,7 @@ button{
   font-size:13px;
 }
 
+/* ================= GRID ================= */
 .stock-grid{
   margin-top:24px;
   display:grid;
@@ -146,6 +167,7 @@ button{
 .compact .price{font-size:20px}
 .compact .stock-grid{grid-template-columns:repeat(auto-fill,minmax(260px,1fr))}
 
+/* ================= LOGIN ================= */
 .login-wrap{
   height:100vh;
   display:flex;
@@ -173,6 +195,7 @@ button{
   color:white;
 }
 
+/* ================= TABLE ================= */
 .table-wrap{
   overflow-x:auto;
 }
