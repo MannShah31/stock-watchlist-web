@@ -6,7 +6,7 @@ import { db } from "./firebase.js";
 import { getPrices } from "./api.js";
 
 export function setupWatchlist({
-  stockGrid, // no longer used but kept for compatibility
+  stockGrid, // kept for compatibility
   dropdown,
   search,
   getUserId,
@@ -16,6 +16,7 @@ export function setupWatchlist({
 
   const tableBody = document.getElementById("stockTableBody");
 
+  /* ---------- SEARCH ---------- */
   search.addEventListener("input", e => {
     const q = e.target.value.toLowerCase().trim();
     dropdown.innerHTML = "";
@@ -36,18 +37,25 @@ export function setupWatchlist({
       });
   });
 
+  /* ---------- ADD STOCK ---------- */
   async function addStock(s) {
     let list = getWatchlist();
     if (list.find(x => x.symbol === s.symbol)) return;
 
     list.push(s);
-    await setDoc(doc(db, "users", getUserId()), { watchlist: list }, { merge: true });
+    await setDoc(
+      doc(db, "users", getUserId()),
+      { watchlist: list },
+      { merge: true }
+    );
+
     setWatchlist(list);
     dropdown.innerHTML = "";
     search.value = "";
     render();
   }
 
+  /* ---------- RENDER TABLE ---------- */
   async function render() {
     const list = getWatchlist();
     tableBody.innerHTML = "";
@@ -66,9 +74,21 @@ export function setupWatchlist({
       const d = data[s.symbol];
       if (!d) return;
 
+      const screenerSymbol = s.symbol
+        .replace(".NS", "")
+        .replace(".BO", "");
+
       const tr = document.createElement("tr");
       tr.innerHTML = `
-        <td>${s.name}</td>
+        <td>
+          <a
+            href="https://www.screener.in/company/${screenerSymbol}/"
+            target="_blank"
+            style="color:#60a5fa;text-decoration:none;font-weight:600"
+          >
+            ${s.name}
+          </a>
+        </td>
         <td>₹${d.price.toFixed(2)}</td>
         <td class="${d.change >= 0 ? "pos" : "neg"}">
           ${d.changePercent.toFixed(2)}%
