@@ -64,8 +64,8 @@ async function loadIndices() {
       const tr = document.createElement("tr");
       tr.innerHTML = `
         <td>${i.name}</td>
-        <td>₹${i.twoYear?.toFixed(2) || "-"}</td>
-        <td>₹${i.oneYear?.toFixed(2) || "-"}</td>
+        <td>₹${i.twoYearAgo?.toFixed(2) || "-"}</td>
+        <td>₹${i.oneYearAgo?.toFixed(2) || "-"}</td>
         <td>₹${i.current.toFixed(2)}</td>
         <td>₹${i.high52.toFixed(2)}</td>
         <td>₹${i.low52.toFixed(2)}</td>
