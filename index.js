@@ -62,58 +62,75 @@ function yahooGET(url) {
 /* =====================
    📈 STOCK DATA (FULL)
 ===================== */
-async function fetchSingleStock(symbol) {
-  try {
-    const enc = encodeURIComponent(symbol);
+function fetchSingleStock(symbol) {
+  return new Promise(resolve => {
+    const safe = encodeURIComponent(symbol.trim());
 
-    // 🔹 Price history (3 months)
-    const chartURL =
-      `https://query1.finance.yahoo.com/v8/finance/chart/${enc}?range=3mo&interval=1d`;
-    const chartJSON = await yahooGET(chartURL);
-    const chart = chartJSON?.chart?.result?.[0];
-    if (!chart) return null;
+    const priceUrl =
+      `https://query1.finance.yahoo.com/v8/finance/chart/${safe}?range=1y&interval=1d`;
 
-    const closesRaw = chart.indicators.quote[0].close;
-    const closes = closesRaw
-      .map((v, i) => v ?? closesRaw[i - 1])
-      .filter(v => v != null);
+    const quoteUrl =
+      `https://query1.finance.yahoo.com/v10/finance/quoteSummary/${safe}?modules=price,defaultKeyStatistics`;
 
-    const current = closes.at(-1);
-    const prevClose = closes.at(-2);
+    https.get(priceUrl, { headers: { "User-Agent": "Mozilla/5.0" } }, r => {
+      let raw = "";
+      r.on("data", d => (raw += d));
+      r.on("end", () => {
+        try {
+          const chart = JSON.parse(raw).chart.result[0];
+          const closesRaw = chart.indicators.quote[0].close;
 
-    const pct = (from, to) => ((to - from) / from) * 100;
+          const closes = closesRaw
+            .map((v, i) => v ?? closesRaw[i - 1])
+            .filter(v => v != null);
 
-    const oneWeek = closes.at(-6);
-    const oneMonth = closes.at(-22);
-    const threeMonth = closes[0];
+          const current = closes.at(-1);
+          const prevClose = closes.at(-2);
 
-    // 🔹 Market Cap + PE
-    const qsURL =
-      `https://query1.finance.yahoo.com/v10/finance/quoteSummary/${enc}?modules=price,summaryDetail`;
-    const qsJSON = await yahooGET(qsURL);
-    const qs = qsJSON?.quoteSummary?.result?.[0];
+          const weekAgo = closes.at(Math.max(closes.length - 6, 0));
+          const monthAgo = closes.at(Math.max(closes.length - 22, 0));
+          const threeMonthAgo = closes.at(Math.max(closes.length - 66, 0));
 
-    return {
-      symbol,
+          // Fetch fundamentals
+          https.get(quoteUrl, { headers: { "User-Agent": "Mozilla/5.0" } }, q => {
+            let qraw = "";
+            q.on("data", d => (qraw += d));
+            q.on("end", () => {
+              try {
+                const summary =
+                  JSON.parse(qraw).quoteSummary.result[0];
 
-      price: current,
-      dayChangeRs: current - prevClose,
-      dayChangePct: pct(prevClose, current),
+                resolve({
+                  symbol,
+                  price: current,
+                  change: current - prevClose,
+                  changePercent: ((current - prevClose) / prevClose) * 100,
 
-      weekChange: oneWeek ? pct(oneWeek, current) : null,
-      monthChange: oneMonth ? pct(oneMonth, current) : null,
-      threeMonthChange: threeMonth ? pct(threeMonth, current) : null,
+                  weekChange: ((current - weekAgo) / weekAgo) * 100,
+                  monthChange: ((current - monthAgo) / monthAgo) * 100,
+                  threeMonthChange:
+                    ((current - threeMonthAgo) / threeMonthAgo) * 100,
 
-      marketCap: qs?.price?.marketCap?.raw ?? null,
-      pe: qs?.summaryDetail?.trailingPE?.raw ?? null,
+                  marketCap:
+                    summary.price.marketCap?.raw ?? null,
 
-      high52: qs?.summaryDetail?.fiftyTwoWeekHigh?.raw ?? null,
-      low52: qs?.summaryDetail?.fiftyTwoWeekLow?.raw ?? null
-    };
-  } catch (e) {
-    console.error("❌ fetchSingleStock error:", symbol, e.message);
-    return null;
-  }
+                  pe:
+                    summary.defaultKeyStatistics.trailingPE?.raw ?? null,
+
+                  high52: summary.price.fiftyTwoWeekHigh?.raw ?? null,
+                  low52: summary.price.fiftyTwoWeekLow?.raw ?? null
+                });
+              } catch {
+                resolve(null);
+              }
+            });
+          }).on("error", () => resolve(null));
+        } catch {
+          resolve(null);
+        }
+      });
+    }).on("error", () => resolve(null));
+  });
 }
 
 /* =====================
