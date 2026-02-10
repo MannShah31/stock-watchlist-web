@@ -67,17 +67,20 @@ function fetchIndexHistory(symbol) {
           const chart = JSON.parse(raw).chart.result[0];
           const rawCloses = chart.indicators.quote[0].close;
 
-          // fill nulls safely
-          const closes = rawCloses.map((v, i) =>
-            v ?? rawCloses[i - 1]
-          ).filter(Boolean);
+          // Fill nulls safely
+          const closes = [];
+          for (let i = 0; i < rawCloses.length; i++) {
+            if (rawCloses[i] != null) closes.push(rawCloses[i]);
+            else if (closes.length) closes.push(closes[closes.length - 1]);
+          }
 
-          if (closes.length < 260) return resolve(null);
+          if (closes.length < 100) return resolve(null);
 
           const current = closes.at(-1);
-          const oneMonthAgo = closes.at(-22);
-          const oneYearAgo = closes.at(-252);
+          const oneMonthAgo = closes.at(Math.max(closes.length - 22, 0));
+          const oneYearAgo = closes.at(Math.max(closes.length - 252, 0));
           const twoYearAgo = closes[0];
+
           const last52 = closes.slice(-252);
 
           resolve({
@@ -89,7 +92,7 @@ function fetchIndexHistory(symbol) {
             mom: ((current - oneMonthAgo) / oneMonthAgo) * 100,
             yoy: ((current - oneYearAgo) / oneYearAgo) * 100
           });
-        } catch {
+        } catch (e) {
           resolve(null);
         }
       });
@@ -98,12 +101,19 @@ function fetchIndexHistory(symbol) {
 }
 
 app.get("/api/indices", async (_, res) => {
-  const results = [];
-  for (const [name, symbol] of Object.entries(INDICES)) {
-    const data = await fetchIndexHistory(symbol);
-    if (data) results.push({ name, ...data });
+  try {
+    const results = [];
+
+    for (const [name, symbol] of Object.entries(INDICES)) {
+      const data = await fetchIndexHistory(symbol);
+      if (data) results.push({ name, ...data });
+    }
+
+    res.json(results);
+  } catch (e) {
+    console.error("❌ Indices API error:", e.message);
+    res.status(500).json({ error: "Failed to load indices" });
   }
-  res.json(results);
 });
 
 /* =====================
@@ -120,6 +130,7 @@ function fetchSingleStock(symbol) {
       r.on("end", () => {
         try {
           const meta = JSON.parse(raw).chart.result[0].meta;
+
           resolve({
             symbol: meta.symbol,
             price: meta.regularMarketPrice,
@@ -144,7 +155,7 @@ function fetchSingleStock(symbol) {
 /* =====================
    EMAIL SENDER
 ===================== */
-async function sendAlertEmail({ email, symbol, target, price, change, changePercent }) {
+async function sendAlertEmail(payload) {
   const res = await fetch("https://api.emailjs.com/api/v1.0/email/send", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
@@ -152,14 +163,7 @@ async function sendAlertEmail({ email, symbol, target, price, change, changePerc
       service_id: EMAILJS_SERVICE,
       template_id: EMAILJS_TEMPLATE,
       user_id: EMAILJS_PUBLIC,
-      template_params: {
-        to_email: email,
-        symbol,
-        alert_price: target,
-        current_price: price,
-        change,
-        change_percent: changePercent
-      }
+      template_params: payload
     })
   });
 
@@ -202,24 +206,28 @@ async function checkAllAlerts() {
         if (!d) continue;
 
         if (d.price >= a.price) {
-          await sendAlertEmail({
-            email: a.email,
-            symbol: a.symbol,
-            target: a.price,
-            price: d.price,
-            change: d.change,
-            changePercent: d.changePercent
-          });
-
-          await fdb
-            .collection("users")
-            .doc(a.uid)
-            .collection("alerts")
-            .doc(a.id)
-            .update({
-              triggered: true,
-              triggeredAt: admin.firestore.FieldValue.serverTimestamp()
+          try {
+            await sendAlertEmail({
+              to_email: a.email,
+              symbol: a.symbol,
+              alert_price: a.price,
+              current_price: d.price,
+              change: d.change,
+              change_percent: d.changePercent
             });
+
+            await fdb
+              .collection("users")
+              .doc(a.uid)
+              .collection("alerts")
+              .doc(a.id)
+              .update({
+                triggered: true,
+                triggeredAt: admin.firestore.FieldValue.serverTimestamp()
+              });
+          } catch (e) {
+            console.error("📧 Email failed:", e.message);
+          }
         }
       }
     }
