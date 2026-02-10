@@ -15,7 +15,7 @@ const PORT = process.env.PORT || 3000;
 const HOST = "0.0.0.0";
 
 /* =====================
-   Firebase Admin Init
+   FIREBASE ADMIN
 ===================== */
 if (!admin.apps.length) {
   admin.initializeApp({
@@ -27,15 +27,11 @@ if (!admin.apps.length) {
 const fdb = admin.firestore();
 
 /* =====================
-   EmailJS ENV
+   EMAILJS CONFIG
 ===================== */
 const EMAILJS_SERVICE = process.env.EMAILJS_SERVICE_ID;
 const EMAILJS_TEMPLATE = process.env.EMAILJS_TEMPLATE_ID;
 const EMAILJS_PUBLIC = process.env.EMAILJS_PUBLIC_KEY;
-
-if (!EMAILJS_SERVICE || !EMAILJS_TEMPLATE || !EMAILJS_PUBLIC) {
-  console.warn("⚠️ EmailJS ENV variables missing");
-}
 
 /* =====================
    HEALTH
@@ -69,8 +65,12 @@ function fetchIndexHistory(symbol) {
       r.on("end", () => {
         try {
           const chart = JSON.parse(raw).chart.result[0];
-          const closesRaw = chart.indicators.quote[0].close;
-          const closes = closesRaw.map((v, i) => v ?? closesRaw[i - 1]).filter(v => v != null);
+          const rawCloses = chart.indicators.quote[0].close;
+
+          // fill nulls safely
+          const closes = rawCloses.map((v, i) =>
+            v ?? rawCloses[i - 1]
+          ).filter(Boolean);
 
           if (closes.length < 260) return resolve(null);
 
@@ -78,15 +78,14 @@ function fetchIndexHistory(symbol) {
           const oneMonthAgo = closes.at(-22);
           const oneYearAgo = closes.at(-252);
           const twoYearAgo = closes[0];
-
-          const last52Weeks = closes.slice(-252);
+          const last52 = closes.slice(-252);
 
           resolve({
             current,
             oneYearAgo,
             twoYearAgo,
-            high52: Math.max(...last52Weeks),
-            low52: Math.min(...last52Weeks),
+            high52: Math.max(...last52),
+            low52: Math.min(...last52),
             mom: ((current - oneMonthAgo) / oneMonthAgo) * 100,
             yoy: ((current - oneYearAgo) / oneYearAgo) * 100
           });
@@ -98,28 +97,13 @@ function fetchIndexHistory(symbol) {
   });
 }
 
-/* =====================
-   📊 INDICES API
-===================== */
 app.get("/api/indices", async (_, res) => {
-  try {
-    const results = [];
-
-    for (const [name, symbol] of Object.entries(INDICES)) {
-      const data = await fetchIndexHistory(symbol);
-      if (data) {
-        results.push({
-          name,
-          ...data
-        });
-      }
-    }
-
-    res.json(results);
-  } catch (e) {
-    console.error("❌ Indices API error:", e.message);
-    res.status(500).json({ error: "Failed to load indices" });
+  const results = [];
+  for (const [name, symbol] of Object.entries(INDICES)) {
+    const data = await fetchIndexHistory(symbol);
+    if (data) results.push({ name, ...data });
   }
+  res.json(results);
 });
 
 /* =====================
@@ -136,7 +120,6 @@ function fetchSingleStock(symbol) {
       r.on("end", () => {
         try {
           const meta = JSON.parse(raw).chart.result[0].meta;
-
           resolve({
             symbol: meta.symbol,
             price: meta.regularMarketPrice,
@@ -181,24 +164,14 @@ async function sendAlertEmail({ email, symbol, target, price, change, changePerc
   });
 
   if (!res.ok) {
-    const text = await res.text();
-    throw new Error(text);
+    throw new Error(await res.text());
   }
 }
 
 /* =====================
-   STOCK PRICES + ALERT ENGINE
+   🔔 ALERT ENGINE (BACKGROUND)
 ===================== */
-app.get("/api/prices", async (req, res) => {
-  let symbols = req.query.symbols;
-  if (!symbols) return res.status(400).json({ error: "Missing symbols" });
-
-  symbols = symbols.split(",").map(s => s.trim()).filter(Boolean);
-  const results = {};
-
-  const data = await Promise.all(symbols.map(fetchSingleStock));
-  data.forEach(d => d && (results[d.symbol] = d));
-
+async function checkAllAlerts() {
   try {
     const users = await fdb.collection("users").get();
 
@@ -210,33 +183,66 @@ app.get("/api/prices", async (req, res) => {
         .where("triggered", "==", false)
         .get();
 
-      for (const a of alertsSnap.docs) {
-        const alert = a.data();
-        const priceData = results[alert.symbol];
-        if (!priceData) continue;
+      if (alertsSnap.empty) continue;
 
-        if (priceData.price >= alert.price) {
+      const alerts = alertsSnap.docs.map(d => ({
+        id: d.id,
+        ...d.data(),
+        uid: u.id
+      }));
+
+      const symbols = [...new Set(alerts.map(a => a.symbol))];
+      const pricesArr = await Promise.all(symbols.map(fetchSingleStock));
+
+      const prices = {};
+      pricesArr.forEach(p => p && (prices[p.symbol] = p));
+
+      for (const a of alerts) {
+        const d = prices[a.symbol];
+        if (!d) continue;
+
+        if (d.price >= a.price) {
           await sendAlertEmail({
-            email: alert.email,
-            symbol: alert.symbol,
-            target: alert.price,
-            price: priceData.price,
-            change: priceData.change,
-            changePercent: priceData.changePercent
+            email: a.email,
+            symbol: a.symbol,
+            target: a.price,
+            price: d.price,
+            change: d.change,
+            changePercent: d.changePercent
           });
 
-          await a.ref.update({
-            triggered: true,
-            triggeredAt: admin.firestore.FieldValue.serverTimestamp()
-          });
+          await fdb
+            .collection("users")
+            .doc(a.uid)
+            .collection("alerts")
+            .doc(a.id)
+            .update({
+              triggered: true,
+              triggeredAt: admin.firestore.FieldValue.serverTimestamp()
+            });
         }
       }
     }
   } catch (e) {
     console.error("❌ Alert engine error:", e.message);
   }
+}
 
-  res.json(results);
+/* run every 60 seconds */
+setInterval(checkAllAlerts, 60 * 1000);
+
+/* =====================
+   API: PRICES
+===================== */
+app.get("/api/prices", async (req, res) => {
+  const symbols = req.query.symbols?.split(",").map(s => s.trim());
+  if (!symbols) return res.status(400).json({ error: "Missing symbols" });
+
+  const data = await Promise.all(symbols.map(fetchSingleStock));
+  const out = {};
+  data.forEach(d => d && (out[d.symbol] = d));
+
+  res.json(out);
 });
 
 /* =====================
