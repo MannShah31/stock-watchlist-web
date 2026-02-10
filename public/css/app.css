@@ -5,46 +5,47 @@ body{
   color:#e5e7eb;
 }
 
-/* ================= HEADER (FIXED & CLICKABLE) ================= */
+/* ================= HEADER ================= */
 header{
-  background:linear-gradient(90deg,#020617,#020617);
+  position: sticky;
+  top: 0;
+  z-index: 10000;
+
+  background:#020617;
   color:#fff;
   padding:18px 32px;
   display:flex;
   justify-content:space-between;
   align-items:center;
   border-bottom:1px solid #1f2a44;
-
-  position: relative;
-  z-index: 1000; /* 🔥 MUST BE ABOVE ALL CONTENT */
 }
 
-header nav{
-  pointer-events: auto;
-}
-
-header nav button{
-  pointer-events: auto;
-  position: relative;
-  z-index: 1001;
+header *{
+  pointer-events:auto;
 }
 
 /* ================= APP LAYOUT ================= */
 .app-wrap{
   position: relative;
-  z-index: 1; /* 🔥 BELOW HEADER */
+  z-index: 1;
 }
 
-/* Ensure tab panels never overlay header */
+/* ================= TAB PANELS ================= */
+/* 🔥 ONLY ACTIVE TAB SHOULD RECEIVE CLICKS */
 #watchTab,
 #alertsTab,
 #indicesTab{
   position: relative;
-  z-index: 1;
+  pointer-events: none;
+}
+
+#watchTab[style*="block"],
+#alertsTab[style*="block"],
+#indicesTab[style*="block"]{
   pointer-events: auto;
 }
 
-/* ================= NAV BUTTONS ================= */
+/* ================= NAV ================= */
 nav button{
   background:#111a2e;
   border:none;
@@ -63,7 +64,7 @@ nav button.active{
   box-shadow:0 0 12px rgba(59,130,246,.6);
 }
 
-/* ================= BUTTONS ================= */
+/* ================= COMMON ================= */
 button{
   background:#3b82f6;
   color:white;
@@ -73,7 +74,6 @@ button{
   cursor:pointer;
 }
 
-/* ================= CARDS ================= */
 .search-card,
 .alert-card{
   background:#0f172a;
@@ -91,81 +91,38 @@ button{
   color:white;
 }
 
-.dropdown{
-  background:#0f172a;
-  border:1px solid #1f2a44;
+/* ================= TABLE ================= */
+.table-wrap{
+  overflow-x:auto;
+  position: relative;
+  z-index: 0;
 }
 
-.option:hover{
-  background:#111a2e;
+.watchlist-table{
+  width:100%;
+  border-collapse:collapse;
+  margin-top:16px;
+  background:rgba(2,6,23,.6);
+  border-radius:12px;
 }
 
-/* ================= STOCK CARDS ================= */
-.stock-card{
-  background:linear-gradient(145deg,#0b1228,#070f24);
-  border-radius:16px;
-  padding:18px;
-  box-shadow:
-    0 10px 40px rgba(0,0,0,.6),
-    inset 0 0 0 1px #1f2a44;
-  transition:.25s;
+.watchlist-table th,
+.watchlist-table td{
+  padding:14px 12px;
+  text-align:left;
+  font-size:14px;
 }
 
-.stock-card.pos{
-  box-shadow:
-    0 10px 40px rgba(0,0,0,.6),
-    inset 0 0 0 1px #1f2a44,
-    0 0 18px rgba(34,197,94,.25);
+.watchlist-table thead{
+  background:rgba(30,58,138,.4);
 }
 
-.stock-card.neg{
-  box-shadow:
-    0 10px 40px rgba(0,0,0,.6),
-    inset 0 0 0 1px #1f2a44,
-    0 0 18px rgba(239,68,68,.25);
+.watchlist-table tbody tr{
+  border-bottom:1px solid rgba(255,255,255,.05);
 }
 
-.stock-card:hover{
-  transform:translateY(-4px);
-  box-shadow:
-    0 20px 60px rgba(0,0,0,.7),
-    inset 0 0 0 1px #3b82f6;
-}
-
-.price{font-size:26px;font-weight:700;margin:6px 0}
-.green{color:#22c55e}
-.red{color:#ef4444}
-
-/* ================= ALERTS ================= */
-.alert-row{
-  display:grid;
-  grid-template-columns:1fr 1fr 1fr 2fr 2fr 50px;
-  gap:8px;
-  align-items:center;
-  border-bottom:1px solid #1f2a44;
-  padding:10px 0;
-}
-
-.alert-chip{
-  background:#1e293b;
-  color:#60a5fa;
-  padding:6px 14px;
-  border-radius:999px;
-  font-weight:600;
-  font-size:13px;
-}
-
-/* ================= GRID ================= */
-.stock-grid{
-  margin-top:24px;
-  display:grid;
-  grid-template-columns:repeat(auto-fill,minmax(320px,1fr));
-  gap:20px;
-}
-
-.compact .stock-card{padding:12px}
-.compact .price{font-size:20px}
-.compact .stock-grid{grid-template-columns:repeat(auto-fill,minmax(260px,1fr))}
+.watchlist-table .pos{color:#22c55e}
+.watchlist-table .neg{color:#ef4444}
 
 /* ================= LOGIN ================= */
 .login-wrap{
@@ -194,50 +151,3 @@ button{
   background:#020617;
   color:white;
 }
-
-/* ================= TABLE ================= */
-.table-wrap{
-  overflow-x:auto;
-}
-
-.watchlist-table{
-  width:100%;
-  border-collapse:collapse;
-  margin-top:16px;
-  background:rgba(2,6,23,.6);
-  border-radius:12px;
-  overflow:hidden;
-}
-
-.watchlist-table th,
-.watchlist-table td{
-  padding:14px 12px;
-  text-align:left;
-  font-size:14px;
-}
-
-.watchlist-table thead{
-  background:rgba(30,58,138,.4);
-}
-
-.watchlist-table tbody tr{
-  border-bottom:1px solid rgba(255,255,255,.05);
-}
-
-.watchlist-table tbody tr:hover{
-  background:rgba(255,255,255,.03);
-}
-
-.watchlist-table .pos{color:#22c55e}
-.watchlist-table .neg{color:#ef4444}
-
-.remove-btn{
-  background:#3b82f6;
-  border:none;
-  color:white;
-  border-radius:6px;
-  padding:6px 10px;
-  cursor:pointer;
-}
-
-.remove-btn:hover{opacity:.85}
