@@ -33,6 +33,12 @@ const EMAILJS_SERVICE = process.env.EMAILJS_SERVICE_ID;
 const EMAILJS_TEMPLATE = process.env.EMAILJS_TEMPLATE_ID;
 const EMAILJS_PUBLIC = process.env.EMAILJS_PUBLIC_KEY;
 
+console.log("📨 EmailJS Loaded:", {
+  service: !!EMAILJS_SERVICE,
+  template: !!EMAILJS_TEMPLATE,
+  publicKey: !!EMAILJS_PUBLIC
+});
+
 /* =====================
    HEALTH
 ===================== */
@@ -144,6 +150,8 @@ function fetchSingleStock(symbol) {
    EMAIL SENDER
 ===================== */
 async function sendAlertEmail(payload) {
+  console.log("📧 Sending email:", payload);
+
   const res = await fetch("https://api.emailjs.com/api/v1.0/email/send", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
@@ -155,17 +163,23 @@ async function sendAlertEmail(payload) {
     })
   });
 
+  const text = await res.text();
+  console.log("📨 EmailJS response:", text);
+
   if (!res.ok) {
-    throw new Error(await res.text());
+    throw new Error(text);
   }
 }
 
 /* =====================
-   🔔 ALERT ENGINE (ONLY PLACE)
+   🔔 ALERT ENGINE (DEBUG)
 ===================== */
 async function checkAllAlerts() {
+  console.log("⏰ Alert engine tick");
+
   try {
     const users = await fdb.collection("users").get();
+    console.log("👥 Users found:", users.size);
 
     for (const u of users.docs) {
       const snap = await fdb
@@ -175,6 +189,7 @@ async function checkAllAlerts() {
         .where("triggered", "==", false)
         .get();
 
+      console.log(`🔔 Alerts for ${u.id}:`, snap.size);
       if (snap.empty) continue;
 
       const alerts = snap.docs.map(d => ({
@@ -184,15 +199,25 @@ async function checkAllAlerts() {
       }));
 
       const symbols = [...new Set(alerts.map(a => a.symbol))];
+      console.log("📈 Fetching prices for:", symbols);
+
       const pricesArr = await Promise.all(symbols.map(fetchSingleStock));
       const prices = {};
       pricesArr.forEach(p => p && (prices[p.symbol] = p));
+
+      console.log("💰 Prices:", prices);
 
       for (const a of alerts) {
         const d = prices[a.symbol];
         if (!d) continue;
 
+        console.log(
+          `🧪 Checking ${a.symbol}: current=${d.price} target=${a.price}`
+        );
+
         if (d.price >= a.price) {
+          console.log("🔥 ALERT TRIGGERED:", a.symbol);
+
           await sendAlertEmail({
             to_email: a.email,
             symbol: a.symbol,
@@ -215,15 +240,15 @@ async function checkAllAlerts() {
       }
     }
   } catch (e) {
-    console.error("❌ Alert engine error:", e.message);
+    console.error("❌ Alert engine crash:", e.message);
   }
 }
 
-/* 🔥 THIS WAS MISSING */
+/* 🔥 RUN EVERY 60s */
 setInterval(checkAllAlerts, 60 * 1000);
 
 /* =====================
-   API: PRICES (NO ALERT LOGIC HERE)
+   API: PRICES (NO ALERTS HERE)
 ===================== */
 app.get("/api/prices", async (req, res) => {
   const symbols = req.query.symbols?.split(",").map(s => s.trim());
