@@ -48,12 +48,8 @@ const alertsTab = document.getElementById("alertsTab");
 const indicesTab = document.getElementById("indicesTab");
 
 /* ================== HELPERS ================== */
-function pctClass(v) {
-  return v >= 0 ? "pos" : "neg";
-}
-
-function fmt(n) {
-  return n === null || n === undefined ? "-" : n.toFixed(2);
+function resetScroll() {
+  window.scrollTo({ top: 0, left: 0, behavior: "instant" });
 }
 
 /* ================== INDICES ================== */
@@ -68,24 +64,34 @@ async function loadIndices() {
       const tr = document.createElement("tr");
       tr.innerHTML = `
         <td>${i.name}</td>
-        <td>₹${i.twoYearAgo?.toFixed(2) || "-"}</td>
-        <td>₹${i.oneYearAgo?.toFixed(2) || "-"}</td>
+        <td>₹${i.twoYear?.toFixed(2) || "-"}</td>
+        <td>₹${i.oneYear?.toFixed(2) || "-"}</td>
         <td>₹${i.current.toFixed(2)}</td>
         <td>₹${i.high52.toFixed(2)}</td>
         <td>₹${i.low52.toFixed(2)}</td>
-        <td class="${i.mom >= 0 ? "pos" : "neg"}">
-          ${i.mom.toFixed(2)}%
-        </td>
-        <td class="${i.yoy >= 0 ? "pos" : "neg"}">
-          ${i.yoy.toFixed(2)}%
-        </td>
+        <td class="${i.mom >= 0 ? "pos" : "neg"}">${i.mom.toFixed(2)}%</td>
+        <td class="${i.yoy >= 0 ? "pos" : "neg"}">${i.yoy.toFixed(2)}%</td>
       `;
       indicesTableBody.appendChild(tr);
     });
   } catch (e) {
-    console.error("Failed to load indices", e);
+    console.error("❌ Failed to load indices", e);
   }
-} 
+}
+
+function startIndicesAutoRefresh() {
+  stopIndicesAutoRefresh();
+  loadIndices();
+  indicesInterval = setInterval(loadIndices, 5 * 60 * 1000); // 5 mins
+}
+
+function stopIndicesAutoRefresh() {
+  if (indicesInterval) {
+    clearInterval(indicesInterval);
+    indicesInterval = null;
+  }
+}
+
 /* ================== AUTH ================== */
 setupAuth({
   loginBtn,
@@ -101,7 +107,9 @@ setupAuth({
     loginScreen.style.display = "none";
     appScreen.style.display = "block";
 
-    // default tab → Watchlist
+    resetScroll();
+
+    // default → Watchlist
     tabWatch.classList.add("active");
     tabAlerts.classList.remove("active");
     tabIndices.classList.remove("active");
@@ -110,10 +118,8 @@ setupAuth({
     alertsTab.style.display = "none";
     indicesTab.style.display = "none";
 
-    // load master stocks
     window.allStocks = await getAllStocks();
 
-    // restore watchlist
     const snap = await getDoc(doc(db, "users", userId));
     watchlist = snap.exists() ? snap.data().watchlist || [] : [];
 
@@ -141,12 +147,12 @@ setupAuth({
   },
 
   onLogout: () => {
+    stopIndicesAutoRefresh();
+
     userId = null;
     watchlist = [];
     alerts = null;
     window.currentUser = null;
-
-    stopIndicesAutoRefresh();
 
     alertList.innerHTML = "";
     alertSymbol.innerHTML = "";
@@ -159,6 +165,7 @@ setupAuth({
 
 /* ================== TAB SWITCHING ================== */
 tabWatch.onclick = () => {
+  resetScroll();
   stopIndicesAutoRefresh();
 
   tabWatch.classList.add("active");
@@ -171,6 +178,7 @@ tabWatch.onclick = () => {
 };
 
 tabAlerts.onclick = () => {
+  resetScroll();
   stopIndicesAutoRefresh();
 
   tabAlerts.classList.add("active");
@@ -187,7 +195,9 @@ tabAlerts.onclick = () => {
   }
 };
 
-tabIndices.onclick = async () => {
+tabIndices.onclick = () => {
+  resetScroll();
+
   tabIndices.classList.add("active");
   tabWatch.classList.remove("active");
   tabAlerts.classList.remove("active");
@@ -196,9 +206,5 @@ tabIndices.onclick = async () => {
   alertsTab.style.display = "none";
   indicesTab.style.display = "block";
 
-  // FORCE one immediate render
-  await loadIndices();
-
-  // then auto-refresh
   startIndicesAutoRefresh();
 };
