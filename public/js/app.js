@@ -85,7 +85,7 @@ async function loadIndices() {
   } catch (e) {
     console.error("Failed to load indices", e);
   }
-}
+} 
 /* ================== AUTH ================== */
 setupAuth({
   loginBtn,
@@ -187,7 +187,7 @@ tabAlerts.onclick = () => {
   }
 };
 
-tabIndices.onclick = () => {
+tabIndices.onclick = async () => {
   tabIndices.classList.add("active");
   tabWatch.classList.remove("active");
   tabAlerts.classList.remove("active");
@@ -196,5 +196,9 @@ tabIndices.onclick = () => {
   alertsTab.style.display = "none";
   indicesTab.style.display = "block";
 
+  // FORCE one immediate render
+  await loadIndices();
+
+  // then auto-refresh
   startIndicesAutoRefresh();
 };
