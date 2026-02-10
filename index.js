@@ -69,7 +69,8 @@ function fetchIndexHistory(symbol) {
       r.on("end", () => {
         try {
           const chart = JSON.parse(raw).chart.result[0];
-          const closes = chart.indicators.quote[0].close.filter(Boolean);
+          const closesRaw = chart.indicators.quote[0].close;
+          const closes = closesRaw.map((v, i) => v ?? closesRaw[i - 1]).filter(v => v != null);
 
           if (closes.length < 260) return resolve(null);
 
