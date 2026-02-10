@@ -2,9 +2,7 @@ const express = require("express");
 const https = require("https");
 const fs = require("fs");
 const path = require("path");
-const fetch = (...args) =>
-  import("node-fetch").then(({ default: fetch }) => fetch(...args));
-
+const nodemailer = require("nodemailer");
 const admin = require("firebase-admin");
 
 const app = express();
@@ -27,17 +25,17 @@ if (!admin.apps.length) {
 const fdb = admin.firestore();
 
 /* =====================
-   EMAILJS CONFIG
+   SMTP CONFIG (NODEMAILER)
 ===================== */
-const EMAILJS_SERVICE = process.env.EMAILJS_SERVICE_ID;
-const EMAILJS_TEMPLATE = process.env.EMAILJS_TEMPLATE_ID;
-const EMAILJS_PUBLIC = process.env.EMAILJS_PUBLIC_KEY;
-
-console.log("📨 EmailJS Loaded:", {
-  service: !!EMAILJS_SERVICE,
-  template: !!EMAILJS_TEMPLATE,
-  publicKey: !!EMAILJS_PUBLIC
+const transporter = nodemailer.createTransport({
+  service: "gmail",
+  auth: {
+    user: process.env.EMAIL_USER,
+    pass: process.env.EMAIL_PASS // Gmail App Password
+  }
 });
+
+console.log("📧 SMTP Ready:", !!process.env.EMAIL_USER);
 
 /* =====================
    HEALTH
@@ -116,8 +114,9 @@ app.get("/api/indices", async (_, res) => {
 ===================== */
 function fetchSingleStock(symbol) {
   return new Promise(resolve => {
-    const safe = encodeURIComponent(symbol.trim());
-    const url = `https://query1.finance.yahoo.com/v8/finance/chart/${safe}?interval=1m&range=1d`;
+    const url = `https://query1.finance.yahoo.com/v8/finance/chart/${encodeURIComponent(
+      symbol
+    )}?interval=1m&range=1d`;
 
     https.get(url, { headers: { "User-Agent": "Mozilla/5.0" } }, r => {
       let raw = "";
@@ -128,7 +127,6 @@ function fetchSingleStock(symbol) {
           resolve({
             symbol: meta.symbol,
             price: meta.regularMarketPrice,
-            previousClose: meta.chartPreviousClose,
             change: meta.regularMarketPrice - meta.chartPreviousClose,
             changePercent:
               ((meta.regularMarketPrice - meta.chartPreviousClose) /
@@ -147,39 +145,34 @@ function fetchSingleStock(symbol) {
 }
 
 /* =====================
-   EMAIL SENDER
+   EMAIL SENDER (SMTP)
 ===================== */
-async function sendAlertEmail(payload) {
-  console.log("📧 Sending email:", payload);
+async function sendAlertEmail({ email, symbol, target, price }) {
+  console.log("📧 Sending alert email:", email, symbol);
 
-  const res = await fetch("https://api.emailjs.com/api/v1.0/email/send", {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({
-      service_id: EMAILJS_SERVICE,
-      template_id: EMAILJS_TEMPLATE,
-      user_id: EMAILJS_PUBLIC,
-      template_params: payload
-    })
+  await transporter.sendMail({
+    from: `"Stock Watchlist" <${process.env.EMAIL_USER}>`,
+    to: email,
+    subject: `🔔 Alert Triggered: ${symbol}`,
+    html: `
+      <h2>Price Alert Triggered</h2>
+      <p><b>Stock:</b> ${symbol}</p>
+      <p><b>Target Price:</b> ₹${target}</p>
+      <p><b>Current Price:</b> ₹${price}</p>
+    `
   });
 
-  const text = await res.text();
-  console.log("📨 EmailJS response:", text);
-
-  if (!res.ok) {
-    throw new Error(text);
-  }
+  console.log("✅ Email sent successfully");
 }
 
 /* =====================
-   🔔 ALERT ENGINE (DEBUG)
+   🔔 ALERT ENGINE (BACKGROUND)
 ===================== */
 async function checkAllAlerts() {
   console.log("⏰ Alert engine tick");
 
   try {
     const users = await fdb.collection("users").get();
-    console.log("👥 Users found:", users.size);
 
     for (const u of users.docs) {
       const snap = await fdb
@@ -189,7 +182,6 @@ async function checkAllAlerts() {
         .where("triggered", "==", false)
         .get();
 
-      console.log(`🔔 Alerts for ${u.id}:`, snap.size);
       if (snap.empty) continue;
 
       const alerts = snap.docs.map(d => ({
@@ -199,32 +191,25 @@ async function checkAllAlerts() {
       }));
 
       const symbols = [...new Set(alerts.map(a => a.symbol))];
-      console.log("📈 Fetching prices for:", symbols);
-
       const pricesArr = await Promise.all(symbols.map(fetchSingleStock));
+
       const prices = {};
       pricesArr.forEach(p => p && (prices[p.symbol] = p));
-
-      console.log("💰 Prices:", prices);
 
       for (const a of alerts) {
         const d = prices[a.symbol];
         if (!d) continue;
 
-        console.log(
-          `🧪 Checking ${a.symbol}: current=${d.price} target=${a.price}`
-        );
+        console.log(`🔍 ${a.symbol} current=${d.price} target=${a.price}`);
 
         if (d.price >= a.price) {
           console.log("🔥 ALERT TRIGGERED:", a.symbol);
 
           await sendAlertEmail({
-            to_email: a.email,
+            email: a.email,
             symbol: a.symbol,
-            alert_price: a.price,
-            current_price: d.price,
-            change: d.change,
-            change_percent: d.changePercent
+            target: a.price,
+            price: d.price
           });
 
           await fdb
@@ -240,15 +225,14 @@ async function checkAllAlerts() {
       }
     }
   } catch (e) {
-    console.error("❌ Alert engine crash:", e.message);
+    console.error("❌ Alert engine error:", e.message);
   }
 }
 
-/* 🔥 RUN EVERY 60s */
 setInterval(checkAllAlerts, 60 * 1000);
 
 /* =====================
-   API: PRICES (NO ALERTS HERE)
+   API: PRICES
 ===================== */
 app.get("/api/prices", async (req, res) => {
   const symbols = req.query.symbols?.split(",").map(s => s.trim());
@@ -259,7 +243,6 @@ app.get("/api/prices", async (req, res) => {
   const data = await Promise.all(symbols.map(fetchSingleStock));
   const prices = {};
   data.forEach(d => d && (prices[d.symbol] = d));
-
   res.json(prices);
 });
 
