@@ -69,9 +69,6 @@ function fetchSingleStock(symbol) {
     const priceUrl =
       `https://query1.finance.yahoo.com/v8/finance/chart/${safe}?range=1y&interval=1d`;
 
-    const quoteUrl =
-      `https://query1.finance.yahoo.com/v10/finance/quoteSummary/${safe}?modules=price,defaultKeyStatistics`;
-
     https.get(priceUrl, { headers: { "User-Agent": "Mozilla/5.0" } }, r => {
       let raw = "";
       r.on("data", d => (raw += d));
@@ -91,41 +88,27 @@ function fetchSingleStock(symbol) {
           const monthAgo = closes.at(Math.max(closes.length - 22, 0));
           const threeMonthAgo = closes.at(Math.max(closes.length - 66, 0));
 
-          // Fetch fundamentals
-          https.get(quoteUrl, { headers: { "User-Agent": "Mozilla/5.0" } }, q => {
-            let qraw = "";
-            q.on("data", d => (qraw += d));
-            q.on("end", () => {
-              try {
-                const summary =
-                  JSON.parse(qraw).quoteSummary.result[0];
+          // ✅ ALWAYS resolve price data
+          resolve({
+            symbol,
+            price: current,
+            change: current - prevClose,
+            changePercent: ((current - prevClose) / prevClose) * 100,
 
-                resolve({
-                  symbol,
-                  price: current,
-                  change: current - prevClose,
-                  changePercent: ((current - prevClose) / prevClose) * 100,
+            weekChange: ((current - weekAgo) / weekAgo) * 100,
+            monthChange: ((current - monthAgo) / monthAgo) * 100,
+            threeMonthChange:
+              ((current - threeMonthAgo) / threeMonthAgo) * 100,
 
-                  weekChange: ((current - weekAgo) / weekAgo) * 100,
-                  monthChange: ((current - monthAgo) / monthAgo) * 100,
-                  threeMonthChange:
-                    ((current - threeMonthAgo) / threeMonthAgo) * 100,
+            // ❗ temporarily null (won’t break UI)
+            marketCap: null,
+            pe: null,
 
-                  marketCap:
-                    summary.price.marketCap?.raw ?? null,
-
-                  pe:
-                    summary.defaultKeyStatistics.trailingPE?.raw ?? null,
-
-                  high52: summary.price.fiftyTwoWeekHigh?.raw ?? null,
-                  low52: summary.price.fiftyTwoWeekLow?.raw ?? null
-                });
-              } catch {
-                resolve(null);
-              }
-            });
-          }).on("error", () => resolve(null));
-        } catch {
+            high52: Math.max(...closes.slice(-252)),
+            low52: Math.min(...closes.slice(-252))
+          });
+        } catch (e) {
+          console.error("❌ Price fetch failed for", symbol, e.message);
           resolve(null);
         }
       });
