@@ -25,17 +25,15 @@ if (!admin.apps.length) {
 const fdb = admin.firestore();
 
 /* =====================
-   SMTP CONFIG (NODEMAILER)
+   SMTP CONFIG
 ===================== */
 const transporter = nodemailer.createTransport({
   service: "gmail",
   auth: {
     user: process.env.EMAIL_USER,
-    pass: process.env.EMAIL_PASS // Gmail App Password
+    pass: process.env.EMAIL_PASS
   }
 });
-
-console.log("📧 SMTP Ready:", !!process.env.EMAIL_USER);
 
 /* =====================
    HEALTH
@@ -43,55 +41,16 @@ console.log("📧 SMTP Ready:", !!process.env.EMAIL_USER);
 app.get("/api/health", (_, res) => res.json({ status: "ok" }));
 
 /* =====================
-   📊 INDICES CONFIG
+   🔧 HELPERS
 ===================== */
-const INDICES = {
-  "Nifty 50": "^NSEI",
-  "Nifty Bank": "^NSEBANK",
-  "Nifty IT": "^CNXIT",
-  "Nifty FMCG": "^CNXFMCG",
-  "Nifty Pharma": "^CNXPHARMA",
-  "Nifty Auto": "^CNXAUTO",
-  "Nifty Metal": "^CNXMETAL",
-  "Nifty Energy": "^CNXENERGY",
-  "Sensex": "^BSESN"
-};
-
-function fetchIndexHistory(symbol) {
+function yahooGET(url) {
   return new Promise(resolve => {
-    const url = `https://query1.finance.yahoo.com/v8/finance/chart/${encodeURIComponent(
-      symbol
-    )}?range=2y&interval=1d`;
-
     https.get(url, { headers: { "User-Agent": "Mozilla/5.0" } }, r => {
       let raw = "";
       r.on("data", d => (raw += d));
       r.on("end", () => {
         try {
-          const chart = JSON.parse(raw).chart.result[0];
-          const rawCloses = chart.indicators.quote[0].close;
-
-          const closes = [];
-          for (let i = 0; i < rawCloses.length; i++) {
-            if (rawCloses[i] != null) closes.push(rawCloses[i]);
-            else if (closes.length) closes.push(closes[closes.length - 1]);
-          }
-
-          const current = closes.at(-1);
-          const oneMonthAgo = closes.at(-22);
-          const oneYearAgo = closes.at(-252);
-          const twoYearAgo = closes[0];
-          const last52 = closes.slice(-252);
-
-          resolve({
-            current,
-            oneYearAgo,
-            twoYearAgo,
-            high52: Math.max(...last52),
-            low52: Math.min(...last52),
-            mom: ((current - oneMonthAgo) / oneMonthAgo) * 100,
-            yoy: ((current - oneYearAgo) / oneYearAgo) * 100
-          });
+          resolve(JSON.parse(raw));
         } catch {
           resolve(null);
         }
@@ -100,132 +59,122 @@ function fetchIndexHistory(symbol) {
   });
 }
 
-app.get("/api/indices", async (_, res) => {
-  const results = [];
-  for (const [name, symbol] of Object.entries(INDICES)) {
-    const data = await fetchIndexHistory(symbol);
-    if (data) results.push({ name, ...data });
+/* =====================
+   📈 STOCK DATA (FULL)
+===================== */
+async function fetchSingleStock(symbol) {
+  try {
+    const enc = encodeURIComponent(symbol);
+
+    // 🔹 Price history (3 months)
+    const chartURL =
+      `https://query1.finance.yahoo.com/v8/finance/chart/${enc}?range=3mo&interval=1d`;
+    const chartJSON = await yahooGET(chartURL);
+    const chart = chartJSON?.chart?.result?.[0];
+    if (!chart) return null;
+
+    const closesRaw = chart.indicators.quote[0].close;
+    const closes = closesRaw
+      .map((v, i) => v ?? closesRaw[i - 1])
+      .filter(v => v != null);
+
+    const current = closes.at(-1);
+    const prevClose = closes.at(-2);
+
+    const pct = (from, to) => ((to - from) / from) * 100;
+
+    const oneWeek = closes.at(-6);
+    const oneMonth = closes.at(-22);
+    const threeMonth = closes[0];
+
+    // 🔹 Market Cap + PE
+    const qsURL =
+      `https://query1.finance.yahoo.com/v10/finance/quoteSummary/${enc}?modules=price,summaryDetail`;
+    const qsJSON = await yahooGET(qsURL);
+    const qs = qsJSON?.quoteSummary?.result?.[0];
+
+    return {
+      symbol,
+
+      price: current,
+      dayChangeRs: current - prevClose,
+      dayChangePct: pct(prevClose, current),
+
+      weekChange: oneWeek ? pct(oneWeek, current) : null,
+      monthChange: oneMonth ? pct(oneMonth, current) : null,
+      threeMonthChange: threeMonth ? pct(threeMonth, current) : null,
+
+      marketCap: qs?.price?.marketCap?.raw ?? null,
+      pe: qs?.summaryDetail?.trailingPE?.raw ?? null,
+
+      high52: qs?.summaryDetail?.fiftyTwoWeekHigh?.raw ?? null,
+      low52: qs?.summaryDetail?.fiftyTwoWeekLow?.raw ?? null
+    };
+  } catch (e) {
+    console.error("❌ fetchSingleStock error:", symbol, e.message);
+    return null;
   }
-  res.json(results);
-});
-
-/* =====================
-   STOCK PRICE FETCH
-===================== */
-function fetchSingleStock(symbol) {
-  return new Promise(resolve => {
-    const url = `https://query1.finance.yahoo.com/v8/finance/chart/${encodeURIComponent(
-      symbol
-    )}?interval=1m&range=1d`;
-
-    https.get(url, { headers: { "User-Agent": "Mozilla/5.0" } }, r => {
-      let raw = "";
-      r.on("data", d => (raw += d));
-      r.on("end", () => {
-        try {
-          const meta = JSON.parse(raw).chart.result[0].meta;
-          resolve({
-            symbol: meta.symbol,
-            price: meta.regularMarketPrice,
-            change: meta.regularMarketPrice - meta.chartPreviousClose,
-            changePercent:
-              ((meta.regularMarketPrice - meta.chartPreviousClose) /
-                meta.chartPreviousClose) *
-              100,
-            high52: meta.fiftyTwoWeekHigh,
-            low52: meta.fiftyTwoWeekLow,
-            volume: meta.regularMarketVolume
-          });
-        } catch {
-          resolve(null);
-        }
-      });
-    }).on("error", () => resolve(null));
-  });
 }
 
 /* =====================
-   EMAIL SENDER (SMTP)
-===================== */
-async function sendAlertEmail({ email, symbol, target, price }) {
-  console.log("📧 Sending alert email:", email, symbol);
-
-  await transporter.sendMail({
-    from: `"Stock Watchlist" <${process.env.EMAIL_USER}>`,
-    to: email,
-    subject: `🔔 Alert Triggered: ${symbol}`,
-    html: `
-      <h2>Price Alert Triggered</h2>
-      <p><b>Stock:</b> ${symbol}</p>
-      <p><b>Target Price:</b> ₹${target}</p>
-      <p><b>Current Price:</b> ₹${price}</p>
-    `
-  });
-
-  console.log("✅ Email sent successfully");
-}
-
-/* =====================
-   🔔 ALERT ENGINE (BACKGROUND)
+   🔔 ALERT ENGINE
 ===================== */
 async function checkAllAlerts() {
   console.log("⏰ Alert engine tick");
 
-  try {
-    const users = await fdb.collection("users").get();
+  const users = await fdb.collection("users").get();
+  for (const u of users.docs) {
+    const snap = await fdb
+      .collection("users")
+      .doc(u.id)
+      .collection("alerts")
+      .where("triggered", "==", false)
+      .get();
 
-    for (const u of users.docs) {
-      const snap = await fdb
-        .collection("users")
-        .doc(u.id)
-        .collection("alerts")
-        .where("triggered", "==", false)
-        .get();
+    if (snap.empty) continue;
 
-      if (snap.empty) continue;
+    const alerts = snap.docs.map(d => ({
+      id: d.id,
+      uid: u.id,
+      ...d.data()
+    }));
 
-      const alerts = snap.docs.map(d => ({
-        id: d.id,
-        uid: u.id,
-        ...d.data()
-      }));
+    const symbols = [...new Set(alerts.map(a => a.symbol))];
+    const pricesArr = await Promise.all(symbols.map(fetchSingleStock));
 
-      const symbols = [...new Set(alerts.map(a => a.symbol))];
-      const pricesArr = await Promise.all(symbols.map(fetchSingleStock));
+    const prices = {};
+    pricesArr.forEach(p => p && (prices[p.symbol] = p));
 
-      const prices = {};
-      pricesArr.forEach(p => p && (prices[p.symbol] = p));
+    for (const a of alerts) {
+      const d = prices[a.symbol];
+      if (!d) continue;
 
-      for (const a of alerts) {
-        const d = prices[a.symbol];
-        if (!d) continue;
+      if (d.price >= a.price) {
+        await transporter.sendMail({
+          from: `"Stock Watchlist" <${process.env.EMAIL_USER}>`,
+          to: a.email,
+          subject: `🔔 Alert Triggered: ${a.symbol}`,
+          html: `
+            <h3>Alert Triggered</h3>
+            <p><b>${a.symbol}</b></p>
+            <p>Target: ₹${a.price}</p>
+            <p>Current: ₹${d.price.toFixed(2)}</p>
+          `
+        });
 
-        console.log(`🔍 ${a.symbol} current=${d.price} target=${a.price}`);
-
-        if (d.price >= a.price) {
-          console.log("🔥 ALERT TRIGGERED:", a.symbol);
-
-          await sendAlertEmail({
-            email: a.email,
-            symbol: a.symbol,
-            target: a.price,
-            price: d.price
+        await fdb
+          .collection("users")
+          .doc(a.uid)
+          .collection("alerts")
+          .doc(a.id)
+          .update({
+            triggered: true,
+            triggeredAt: admin.firestore.FieldValue.serverTimestamp()
           });
 
-          await fdb
-            .collection("users")
-            .doc(a.uid)
-            .collection("alerts")
-            .doc(a.id)
-            .update({
-              triggered: true,
-              triggeredAt: admin.firestore.FieldValue.serverTimestamp()
-            });
-        }
+        console.log("🔥 Alert triggered:", a.symbol);
       }
     }
-  } catch (e) {
-    console.error("❌ Alert engine error:", e.message);
   }
 }
 
@@ -240,10 +189,13 @@ app.get("/api/prices", async (req, res) => {
     return res.status(400).json({ error: "Missing symbols" });
   }
 
+  console.log("📊 Price fetch:", symbols);
+
   const data = await Promise.all(symbols.map(fetchSingleStock));
-  const prices = {};
-  data.forEach(d => d && (prices[d.symbol] = d));
-  res.json(prices);
+  const out = {};
+  data.forEach(d => d && (out[d.symbol] = d));
+
+  res.json(out);
 });
 
 /* =====================
