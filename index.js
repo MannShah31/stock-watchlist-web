@@ -235,24 +235,59 @@ async function checkAllAlerts() {
     console.error("❌ Alert engine error:", e.message);
   }
 }
-
-/* run every 60 seconds */
-setInterval(checkAllAlerts, 60 * 1000);
-
 /* =====================
    API: PRICES
 ===================== */
 app.get("/api/prices", async (req, res) => {
   const symbols = req.query.symbols?.split(",").map(s => s.trim());
-  if (!symbols) return res.status(400).json({ error: "Missing symbols" });
+  if (!symbols || !symbols.length) {
+    return res.status(400).json({ error: "Missing symbols" });
+  }
 
-  const data = await Promise.all(symbols.map(fetchSingleStock));
-  const out = {};
-  data.forEach(d => d && (out[d.symbol] = d));
+  const priceArr = await Promise.all(symbols.map(fetchSingleStock));
+  const prices = {};
+  priceArr.forEach(p => p && (prices[p.symbol] = p));
 
-  res.json(out);
+  // 🔔 ALERT CHECK (RELIABLE)
+  try {
+    const users = await fdb.collection("users").get();
+
+    for (const u of users.docs) {
+      const alertsSnap = await fdb
+        .collection("users")
+        .doc(u.id)
+        .collection("alerts")
+        .where("triggered", "==", false)
+        .get();
+
+      for (const a of alertsSnap.docs) {
+        const alert = a.data();
+        const d = prices[alert.symbol];
+        if (!d) continue;
+
+        if (d.price >= alert.price) {
+          await sendAlertEmail({
+            email: alert.email,
+            symbol: alert.symbol,
+            target: alert.price,
+            price: d.price,
+            change: d.change,
+            changePercent: d.changePercent
+          });
+
+          await a.ref.update({
+            triggered: true,
+            triggeredAt: admin.firestore.FieldValue.serverTimestamp()
+          });
+        }
+      }
+    }
+  } catch (e) {
+    console.error("❌ Alert processing error:", e.message);
+  }
+
+  res.json(prices);
 });
-
 /* =====================
    STOCK MASTER
 ===================== */
