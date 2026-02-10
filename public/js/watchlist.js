@@ -55,6 +55,22 @@ export function setupWatchlist({
     render();
   }
 
+  /* ---------- FORMATTERS ---------- */
+  const pct = v =>
+    v === null || v === undefined
+      ? "-"
+      : `${v.toFixed(2)}%`;
+
+  const rs = v =>
+    v === null || v === undefined
+      ? "-"
+      : `₹${v.toFixed(2)}`;
+
+  const cr = v =>
+    v === null || v === undefined
+      ? "-"
+      : `₹${(v / 1e7).toFixed(2)} Cr`;
+
   /* ---------- RENDER TABLE ---------- */
   async function render() {
     const list = getWatchlist();
@@ -63,7 +79,7 @@ export function setupWatchlist({
     if (!list.length) {
       tableBody.innerHTML = `
         <tr>
-          <td colspan="7" style="opacity:.5">Add stocks to your watchlist</td>
+          <td colspan="11" style="opacity:.5">Add stocks to your watchlist</td>
         </tr>`;
       return;
     }
@@ -89,13 +105,32 @@ export function setupWatchlist({
             ${s.name}
           </a>
         </td>
-        <td>₹${d.price.toFixed(2)}</td>
-        <td class="${d.change >= 0 ? "pos" : "neg"}">
-          ${d.changePercent.toFixed(2)}%
+
+        <td>${rs(d.price)}</td>
+
+        <td class="${d.dayChangeRs >= 0 ? "pos" : "neg"}">
+          ${rs(d.dayChangeRs)}
         </td>
-        <td>${d.volume.toLocaleString()}</td>
-        <td>${d.high52}</td>
-        <td>${d.low52}</td>
+
+        <td class="${d.weekChange >= 0 ? "pos" : "neg"}">
+          ${pct(d.weekChange)}
+        </td>
+
+        <td class="${d.monthChange >= 0 ? "pos" : "neg"}">
+          ${pct(d.monthChange)}
+        </td>
+
+        <td class="${d.threeMonthChange >= 0 ? "pos" : "neg"}">
+          ${pct(d.threeMonthChange)}
+        </td>
+
+        <td>${cr(d.marketCap)}</td>
+
+        <td>${d.pe ? d.pe.toFixed(1) : "-"}</td>
+
+        <td>${d.high52 ?? "-"}</td>
+        <td>${d.low52 ?? "-"}</td>
+
         <td>
           <button class="remove-btn" data-sym="${s.symbol}">✕</button>
         </td>
