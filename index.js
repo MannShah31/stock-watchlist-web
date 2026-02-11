@@ -55,7 +55,7 @@ function yahooGET(url) {
 }
 
 /* =====================
-   SAFE MATH
+   SAFE % CALC
 ===================== */
 function pct(current, past) {
   if (!current || !past) return null;
@@ -92,29 +92,20 @@ async function fetchSingleStock(symbol) {
     const monthAgo = closes.at(Math.max(closes.length - 22, 0));
     const threeMonthAgo = closes.at(Math.max(closes.length - 66, 0));
 
-    /* -------- FUNDAMENTALS -------- */
-    const fundamentals = await yahooGET(
-      `https://query1.finance.yahoo.com/v10/finance/quoteSummary/${safe}?modules=summaryDetail,defaultKeyStatistics`
+    /* -------- FUNDAMENTALS (CORRECT ENDPOINT) -------- */
+    const quoteData = await yahooGET(
+      `https://query1.finance.yahoo.com/v7/finance/quote?symbols=${safe}`
     );
 
     let marketCap = null;
     let pe = null;
 
-    if (fundamentals?.quoteSummary?.result?.[0]) {
-      const f = fundamentals.quoteSummary.result[0];
-
-      marketCap =
-        f.summaryDetail?.marketCap?.raw ??
-        f.defaultKeyStatistics?.marketCap?.raw ??
-        null;
-
-      pe =
-        f.summaryDetail?.trailingPE?.raw ??
-        f.defaultKeyStatistics?.trailingPE?.raw ??
-        null;
+    if (quoteData?.quoteResponse?.result?.[0]) {
+      const q = quoteData.quoteResponse.result[0];
+      marketCap = q.marketCap ?? null;
+      pe = q.trailingPE ?? null;
     }
 
-    /* -------- RETURN CLEAN DATA -------- */
     return {
       symbol,
       price: current,
