@@ -128,9 +128,9 @@ export function setupWatchlist({
 
         <td>${d.pe ? d.pe.toFixed(1) : "-"}</td>
 
-        <td>${d.high52 ?? "-"}</td>
-        <td>${d.low52 ?? "-"}</td>
-
+        ${d.high52?.toFixed(2)}
+        ${d.low52?.toFixed(2)}
+        
         <td>
           <button class="remove-btn" data-sym="${s.symbol}">✕</button>
         </td>

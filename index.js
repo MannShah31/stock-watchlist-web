@@ -92,7 +92,7 @@ function fetchSingleStock(symbol) {
           resolve({
             symbol,
             price: current,
-            change: current - prevClose,
+            dayChange: current - prevClose,
             changePercent: ((current - prevClose) / prevClose) * 100,
 
             weekChange: ((current - weekAgo) / weekAgo) * 100,
