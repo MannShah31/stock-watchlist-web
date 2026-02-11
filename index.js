@@ -73,49 +73,45 @@ async function fetchSingleStock(symbol) {
       `https://query1.finance.yahoo.com/v8/finance/chart/${safe}?range=1y&interval=1d`
     );
 
-    if (!chartData?.chart?.result?.[0]) return null;
+    if (!chartData?.chart?.result?.[0]) {
+      console.log("❌ No chart data for", symbol);
+      return null;
+    }
 
     const result = chartData.chart.result[0];
     const meta = result.meta;
+
+    console.log("📊 META DATA FOR", symbol);
+    console.log("marketCap:", meta.marketCap);
+    console.log("trailingPE:", meta.trailingPE);
+    console.log("full meta keys:", Object.keys(meta));
+
     const closesRaw = result.indicators.quote[0].close;
 
     const closes = closesRaw
       .map((v, i) => v ?? closesRaw[i - 1])
       .filter(v => v != null);
 
-    if (!closes.length) return null;
-
     const current = meta.regularMarketPrice;
     const prevClose = meta.chartPreviousClose;
-
-    const weekAgo = closes.at(Math.max(closes.length - 6, 0));
-    const monthAgo = closes.at(Math.max(closes.length - 22, 0));
-    const threeMonthAgo = closes.at(Math.max(closes.length - 66, 0));
 
     return {
       symbol,
       price: current,
-
-      /* 1D */
       dayChange: prevClose ? current - prevClose : null,
       changePercent: prevClose
         ? ((current - prevClose) / prevClose) * 100
         : null,
 
-      /* 1W / 1M / 3M */
-      weekChange: weekAgo ? ((current - weekAgo) / weekAgo) * 100 : null,
-      monthChange: monthAgo ? ((current - monthAgo) / monthAgo) * 100 : null,
-      threeMonthChange: threeMonthAgo
-        ? ((current - threeMonthAgo) / threeMonthAgo) * 100
-        : null,
+      weekChange: null,
+      monthChange: null,
+      threeMonthChange: null,
 
-      /* ✅ MARKET CAP & PE FROM META */
       marketCap: meta.marketCap ?? null,
       pe: meta.trailingPE ?? null,
 
-      /* 52W */
-      high52: meta.fiftyTwoWeekHigh ?? Math.max(...closes.slice(-252)),
-      low52: meta.fiftyTwoWeekLow ?? Math.min(...closes.slice(-252))
+      high52: meta.fiftyTwoWeekHigh,
+      low52: meta.fiftyTwoWeekLow
     };
 
   } catch (e) {
