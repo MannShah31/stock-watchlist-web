@@ -36,12 +36,7 @@ const transporter = nodemailer.createTransport({
 });
 
 /* =====================
-   HEALTH
-===================== */
-app.get("/api/health", (_, res) => res.json({ status: "ok" }));
-
-/* =====================
-   🔧 HELPERS
+   HELPER: YAHOO GET
 ===================== */
 function yahooGET(url) {
   return new Promise(resolve => {
@@ -60,69 +55,92 @@ function yahooGET(url) {
 }
 
 /* =====================
-   📈 STOCK DATA (FULL)
+   FETCH FULL STOCK DATA
 ===================== */
-function fetchSingleStock(symbol) {
-  return new Promise(resolve => {
+async function fetchSingleStock(symbol) {
+  try {
     const safe = encodeURIComponent(symbol.trim());
 
-    const priceUrl =
-      `https://query1.finance.yahoo.com/v8/finance/chart/${safe}?range=1y&interval=1d`;
+    /* -------- PRICE + HISTORY -------- */
+    const chartData = await yahooGET(
+      `https://query1.finance.yahoo.com/v8/finance/chart/${safe}?range=1y&interval=1d`
+    );
 
-    https.get(priceUrl, { headers: { "User-Agent": "Mozilla/5.0" } }, r => {
-      let raw = "";
-      r.on("data", d => (raw += d));
-      r.on("end", () => {
-        try {
-          const chart = JSON.parse(raw).chart.result[0];
-          const closesRaw = chart.indicators.quote[0].close;
+    if (!chartData?.chart?.result?.[0]) return null;
 
-          const closes = closesRaw
-            .map((v, i) => v ?? closesRaw[i - 1])
-            .filter(v => v != null);
+    const chart = chartData.chart.result[0];
+    const closesRaw = chart.indicators.quote[0].close;
 
-          const current = closes.at(-1);
-          const prevClose = closes.at(-2);
+    const closes = closesRaw
+      .map((v, i) => v ?? closesRaw[i - 1])
+      .filter(v => v != null);
 
-          const weekAgo = closes.at(Math.max(closes.length - 6, 0));
-          const monthAgo = closes.at(Math.max(closes.length - 22, 0));
-          const threeMonthAgo = closes.at(Math.max(closes.length - 66, 0));
+    if (!closes.length) return null;
 
-          // ✅ ALWAYS resolve price data
-          resolve({
-            symbol,
-            price: current,
-            dayChange: current - prevClose,
-            changePercent: ((current - prevClose) / prevClose) * 100,
+    const current = closes.at(-1);
+    const prevClose = closes.at(-2);
 
-            weekChange: ((current - weekAgo) / weekAgo) * 100,
-            monthChange: ((current - monthAgo) / monthAgo) * 100,
-            threeMonthChange:
-              ((current - threeMonthAgo) / threeMonthAgo) * 100,
+    const weekAgo = closes.at(Math.max(closes.length - 6, 0));
+    const monthAgo = closes.at(Math.max(closes.length - 22, 0));
+    const threeMonthAgo = closes.at(Math.max(closes.length - 66, 0));
 
-            // ❗ temporarily null (won’t break UI)
-            marketCap: null,
-            pe: null,
+    /* -------- FUNDAMENTALS -------- */
+    const fundamentals = await yahooGET(
+      `https://query1.finance.yahoo.com/v10/finance/quoteSummary/${safe}?modules=summaryDetail,defaultKeyStatistics`
+    );
 
-            high52: Math.max(...closes.slice(-252)),
-            low52: Math.min(...closes.slice(-252))
-          });
-        } catch (e) {
-          console.error("❌ Price fetch failed for", symbol, e.message);
-          resolve(null);
-        }
-      });
-    }).on("error", () => resolve(null));
-  });
+    let marketCap = null;
+    let pe = null;
+
+    if (fundamentals?.quoteSummary?.result?.[0]) {
+      const f = fundamentals.quoteSummary.result[0];
+
+      marketCap =
+        f.summaryDetail?.marketCap?.raw ||
+        f.defaultKeyStatistics?.marketCap?.raw ||
+        null;
+
+      pe =
+        f.summaryDetail?.trailingPE?.raw ||
+        f.defaultKeyStatistics?.trailingPE?.raw ||
+        null;
+    }
+
+    return {
+      symbol,
+      price: current,
+
+      /* 1 Day */
+      dayChange: current - prevClose,
+      changePercent: ((current - prevClose) / prevClose) * 100,
+
+      /* 1W / 1M / 3M */
+      weekChange: ((current - weekAgo) / weekAgo) * 100,
+      monthChange: ((current - monthAgo) / monthAgo) * 100,
+      threeMonthChange:
+        ((current - threeMonthAgo) / threeMonthAgo) * 100,
+
+      /* Fundamentals */
+      marketCap,
+      pe,
+
+      /* 52W */
+      high52: Math.max(...closes.slice(-252)),
+      low52: Math.min(...closes.slice(-252))
+    };
+
+  } catch (e) {
+    console.error("❌ fetchSingleStock error:", symbol, e.message);
+    return null;
+  }
 }
 
 /* =====================
-   🔔 ALERT ENGINE
+   ALERT ENGINE
 ===================== */
 async function checkAllAlerts() {
-  console.log("⏰ Alert engine tick");
-
   const users = await fdb.collection("users").get();
+
   for (const u of users.docs) {
     const snap = await fdb
       .collection("users")
@@ -171,8 +189,6 @@ async function checkAllAlerts() {
             triggered: true,
             triggeredAt: admin.firestore.FieldValue.serverTimestamp()
           });
-
-        console.log("🔥 Alert triggered:", a.symbol);
       }
     }
   }
@@ -188,8 +204,6 @@ app.get("/api/prices", async (req, res) => {
   if (!symbols || !symbols.length) {
     return res.status(400).json({ error: "Missing symbols" });
   }
-
-  console.log("📊 Price fetch:", symbols);
 
   const data = await Promise.all(symbols.map(fetchSingleStock));
   const out = {};
