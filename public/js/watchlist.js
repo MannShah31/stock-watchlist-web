@@ -6,7 +6,7 @@ import { db } from "./firebase.js";
 import { getPrices } from "./api.js";
 
 export function setupWatchlist({
-  stockGrid, // kept for compatibility
+  stockGrid,
   dropdown,
   search,
   getUserId,
@@ -71,6 +71,13 @@ export function setupWatchlist({
       ? "-"
       : `₹${(v / 1e7).toFixed(2)} Cr`;
 
+  const cls = v =>
+    v === null || v === undefined
+      ? ""
+      : v >= 0
+      ? "pos"
+      : "neg";
+
   /* ---------- RENDER TABLE ---------- */
   async function render() {
     const list = getWatchlist();
@@ -95,6 +102,7 @@ export function setupWatchlist({
         .replace(".BO", "");
 
       const tr = document.createElement("tr");
+
       tr.innerHTML = `
         <td>
           <a
@@ -108,29 +116,36 @@ export function setupWatchlist({
 
         <td>${rs(d.price)}</td>
 
-        <td class="${d.dayChangeRs >= 0 ? "pos" : "neg"}">
-          ${rs(d.dayChangeRs)}
+        <td class="${cls(d.dayChange)}">
+          ${rs(d.dayChange)}
         </td>
 
-        <td class="${d.weekChange >= 0 ? "pos" : "neg"}">
+        <td class="${cls(d.weekChange)}">
           ${pct(d.weekChange)}
         </td>
 
-        <td class="${d.monthChange >= 0 ? "pos" : "neg"}">
+        <td class="${cls(d.monthChange)}">
           ${pct(d.monthChange)}
         </td>
 
-        <td class="${d.threeMonthChange >= 0 ? "pos" : "neg"}">
+        <td class="${cls(d.threeMonthChange)}">
           ${pct(d.threeMonthChange)}
         </td>
 
         <td>${cr(d.marketCap)}</td>
 
-        <td>${d.pe ? d.pe.toFixed(1) : "-"}</td>
+        <td>
+          ${d.pe ? d.pe.toFixed(1) : "-"}
+        </td>
 
-        ${d.high52?.toFixed(2)}
-        ${d.low52?.toFixed(2)}
-        
+        <td>
+          ${d.high52 ? d.high52.toFixed(2) : "-"}
+        </td>
+
+        <td>
+          ${d.low52 ? d.low52.toFixed(2) : "-"}
+        </td>
+
         <td>
           <button class="remove-btn" data-sym="${s.symbol}">✕</button>
         </td>
