@@ -136,8 +136,6 @@ async function fetchSingleStock(symbol) {
     return null;
   }
 }
-
-
 /* =====================
    ALERT ENGINE
 ===================== */
