@@ -79,92 +79,108 @@ export function setupWatchlist({
       : "neg";
 
   /* ---------- RENDER TABLE ---------- */
-  async function render() {
-    const list = getWatchlist();
-    tableBody.innerHTML = "";
+async function render() {
+  const list = getWatchlist();
+  tableBody.innerHTML = "";
 
-    if (!list.length) {
-      tableBody.innerHTML = `
-        <tr>
-          <td colspan="11" style="opacity:.5">Add stocks to your watchlist</td>
-        </tr>`;
-      return;
+  if (!list.length) {
+    tableBody.innerHTML = `
+      <tr>
+        <td colspan="11" style="opacity:.5">
+          Add stocks to your watchlist
+        </td>
+      </tr>`;
+    return;
+  }
+
+  const priceData = await getPrices(list.map(s => s.symbol));
+
+  for (const s of list) {
+    const d = priceData[s.symbol];
+    if (!d) continue;
+
+    /* 🔥 Fetch fundamentals from browser (NOT server) */
+    let marketCap = null;
+    let pe = null;
+
+    try {
+      const res = await fetch(
+        `https://query1.finance.yahoo.com/v7/finance/quote?symbols=${s.symbol}`
+      );
+      const json = await res.json();
+      const q = json.quoteResponse?.result?.[0];
+
+      marketCap = q?.marketCap ?? null;
+      pe = q?.trailingPE ?? null;
+
+    } catch (e) {
+      console.log("Fundamental fetch failed:", s.symbol);
     }
 
-    const data = await getPrices(list.map(s => s.symbol));
+    const screenerSymbol = s.symbol
+      .replace(".NS", "")
+      .replace(".BO", "");
 
-    list.forEach(s => {
-      const d = data[s.symbol];
-      if (!d) return;
+    const tr = document.createElement("tr");
+    tr.innerHTML = `
+      <td>
+        <a href="https://www.screener.in/company/${screenerSymbol}/"
+           target="_blank"
+           style="color:#60a5fa;text-decoration:none;font-weight:600">
+          ${s.name}
+        </a>
+      </td>
 
-      const screenerSymbol = s.symbol
-        .replace(".NS", "")
-        .replace(".BO", "");
+      <td>₹${d.price.toFixed(2)}</td>
 
-      const tr = document.createElement("tr");
+      <td class="${d.dayChange >= 0 ? "pos" : "neg"}">
+        ₹${d.dayChange?.toFixed(2) ?? "-"}
+      </td>
 
-      tr.innerHTML = `
-        <td>
-          <a
-            href="https://www.screener.in/company/${screenerSymbol}/"
-            target="_blank"
-            style="color:#60a5fa;text-decoration:none;font-weight:600"
-          >
-            ${s.name}
-          </a>
-        </td>
+      <td class="${d.weekChange >= 0 ? "pos" : "neg"}">
+        ${d.weekChange?.toFixed(2) ?? "-"}%
+      </td>
 
-        <td>${rs(d.price)}</td>
+      <td class="${d.monthChange >= 0 ? "pos" : "neg"}">
+        ${d.monthChange?.toFixed(2) ?? "-"}%
+      </td>
 
-        <td class="${cls(d.dayChange)}">
-          ${rs(d.dayChange)}
-        </td>
+      <td class="${d.threeMonthChange >= 0 ? "pos" : "neg"}">
+        ${d.threeMonthChange?.toFixed(2) ?? "-"}%
+      </td>
 
-        <td class="${cls(d.weekChange)}">
-          ${pct(d.weekChange)}
-        </td>
+      <td>
+        ${marketCap
+          ? `₹${(marketCap / 1e7).toFixed(2)} Cr`
+          : "-"}
+      </td>
 
-        <td class="${cls(d.monthChange)}">
-          ${pct(d.monthChange)}
-        </td>
+      <td>
+        ${pe ? pe.toFixed(1) : "-"}
+      </td>
 
-        <td class="${cls(d.threeMonthChange)}">
-          ${pct(d.threeMonthChange)}
-        </td>
+      <td>${d.high52?.toFixed(2) ?? "-"}</td>
+      <td>${d.low52?.toFixed(2) ?? "-"}</td>
 
-        <td>${cr(d.marketCap)}</td>
+      <td>
+        <button class="remove-btn" data-sym="${s.symbol}">✕</button>
+      </td>
+    `;
 
-        <td>
-          ${d.pe ? d.pe.toFixed(1) : "-"}
-        </td>
+    tr.querySelector(".remove-btn").onclick = async () => {
+      let updated = getWatchlist().filter(x => x.symbol !== s.symbol);
+      await setDoc(
+        doc(db, "users", getUserId()),
+        { watchlist: updated },
+        { merge: true }
+      );
+      setWatchlist(updated);
+      render();
+    };
 
-        <td>
-          ${d.high52 ? d.high52.toFixed(2) : "-"}
-        </td>
-
-        <td>
-          ${d.low52 ? d.low52.toFixed(2) : "-"}
-        </td>
-
-        <td>
-          <button class="remove-btn" data-sym="${s.symbol}">✕</button>
-        </td>
-      `;
-
-      tr.querySelector(".remove-btn").onclick = async () => {
-        let updated = getWatchlist().filter(x => x.symbol !== s.symbol);
-        await setDoc(
-          doc(db, "users", getUserId()),
-          { watchlist: updated },
-          { merge: true }
-        );
-        setWatchlist(updated);
-        render();
-      };
-
-      tableBody.appendChild(tr);
-    });
+    tableBody.appendChild(tr);
   }
+}
 
   return { render };
 }
