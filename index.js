@@ -55,13 +55,21 @@ function yahooGET(url) {
 }
 
 /* =====================
+   SAFE MATH
+===================== */
+function pct(current, past) {
+  if (!current || !past) return null;
+  return ((current - past) / past) * 100;
+}
+
+/* =====================
    FETCH FULL STOCK DATA
 ===================== */
 async function fetchSingleStock(symbol) {
   try {
     const safe = encodeURIComponent(symbol.trim());
 
-    /* -------- PRICE + HISTORY -------- */
+    /* -------- PRICE HISTORY -------- */
     const chartData = await yahooGET(
       `https://query1.finance.yahoo.com/v8/finance/chart/${safe}?range=1y&interval=1d`
     );
@@ -96,29 +104,29 @@ async function fetchSingleStock(symbol) {
       const f = fundamentals.quoteSummary.result[0];
 
       marketCap =
-        f.summaryDetail?.marketCap?.raw ||
-        f.defaultKeyStatistics?.marketCap?.raw ||
+        f.summaryDetail?.marketCap?.raw ??
+        f.defaultKeyStatistics?.marketCap?.raw ??
         null;
 
       pe =
-        f.summaryDetail?.trailingPE?.raw ||
-        f.defaultKeyStatistics?.trailingPE?.raw ||
+        f.summaryDetail?.trailingPE?.raw ??
+        f.defaultKeyStatistics?.trailingPE?.raw ??
         null;
     }
 
+    /* -------- RETURN CLEAN DATA -------- */
     return {
       symbol,
       price: current,
 
-      /* 1 Day */
-      dayChange: current - prevClose,
-      changePercent: ((current - prevClose) / prevClose) * 100,
+      /* 1D */
+      dayChange: prevClose ? current - prevClose : null,
+      changePercent: pct(current, prevClose),
 
       /* 1W / 1M / 3M */
-      weekChange: ((current - weekAgo) / weekAgo) * 100,
-      monthChange: ((current - monthAgo) / monthAgo) * 100,
-      threeMonthChange:
-        ((current - threeMonthAgo) / threeMonthAgo) * 100,
+      weekChange: pct(current, weekAgo),
+      monthChange: pct(current, monthAgo),
+      threeMonthChange: pct(current, threeMonthAgo),
 
       /* Fundamentals */
       marketCap,
@@ -139,58 +147,62 @@ async function fetchSingleStock(symbol) {
    ALERT ENGINE
 ===================== */
 async function checkAllAlerts() {
-  const users = await fdb.collection("users").get();
+  try {
+    const users = await fdb.collection("users").get();
 
-  for (const u of users.docs) {
-    const snap = await fdb
-      .collection("users")
-      .doc(u.id)
-      .collection("alerts")
-      .where("triggered", "==", false)
-      .get();
+    for (const u of users.docs) {
+      const snap = await fdb
+        .collection("users")
+        .doc(u.id)
+        .collection("alerts")
+        .where("triggered", "==", false)
+        .get();
 
-    if (snap.empty) continue;
+      if (snap.empty) continue;
 
-    const alerts = snap.docs.map(d => ({
-      id: d.id,
-      uid: u.id,
-      ...d.data()
-    }));
+      const alerts = snap.docs.map(d => ({
+        id: d.id,
+        uid: u.id,
+        ...d.data()
+      }));
 
-    const symbols = [...new Set(alerts.map(a => a.symbol))];
-    const pricesArr = await Promise.all(symbols.map(fetchSingleStock));
+      const symbols = [...new Set(alerts.map(a => a.symbol))];
+      const pricesArr = await Promise.all(symbols.map(fetchSingleStock));
 
-    const prices = {};
-    pricesArr.forEach(p => p && (prices[p.symbol] = p));
+      const prices = {};
+      pricesArr.forEach(p => p && (prices[p.symbol] = p));
 
-    for (const a of alerts) {
-      const d = prices[a.symbol];
-      if (!d) continue;
+      for (const a of alerts) {
+        const d = prices[a.symbol];
+        if (!d || !d.price) continue;
 
-      if (d.price >= a.price) {
-        await transporter.sendMail({
-          from: `"Stock Watchlist" <${process.env.EMAIL_USER}>`,
-          to: a.email,
-          subject: `🔔 Alert Triggered: ${a.symbol}`,
-          html: `
-            <h3>Alert Triggered</h3>
-            <p><b>${a.symbol}</b></p>
-            <p>Target: ₹${a.price}</p>
-            <p>Current: ₹${d.price.toFixed(2)}</p>
-          `
-        });
-
-        await fdb
-          .collection("users")
-          .doc(a.uid)
-          .collection("alerts")
-          .doc(a.id)
-          .update({
-            triggered: true,
-            triggeredAt: admin.firestore.FieldValue.serverTimestamp()
+        if (d.price >= a.price) {
+          await transporter.sendMail({
+            from: `"Stock Watchlist" <${process.env.EMAIL_USER}>`,
+            to: a.email,
+            subject: `🔔 Alert Triggered: ${a.symbol}`,
+            html: `
+              <h3>Alert Triggered</h3>
+              <p><b>${a.symbol}</b></p>
+              <p>Target: ₹${a.price}</p>
+              <p>Current: ₹${d.price.toFixed(2)}</p>
+            `
           });
+
+          await fdb
+            .collection("users")
+            .doc(a.uid)
+            .collection("alerts")
+            .doc(a.id)
+            .update({
+              triggered: true,
+              triggeredAt: admin.firestore.FieldValue.serverTimestamp()
+            });
+        }
       }
     }
+  } catch (e) {
+    console.error("❌ Alert engine error:", e.message);
   }
 }
 
