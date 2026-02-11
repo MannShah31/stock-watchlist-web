@@ -69,15 +69,15 @@ async function fetchSingleStock(symbol) {
   try {
     const safe = encodeURIComponent(symbol.trim());
 
-    /* -------- PRICE HISTORY -------- */
     const chartData = await yahooGET(
       `https://query1.finance.yahoo.com/v8/finance/chart/${safe}?range=1y&interval=1d`
     );
 
     if (!chartData?.chart?.result?.[0]) return null;
 
-    const chart = chartData.chart.result[0];
-    const closesRaw = chart.indicators.quote[0].close;
+    const result = chartData.chart.result[0];
+    const meta = result.meta;
+    const closesRaw = result.indicators.quote[0].close;
 
     const closes = closesRaw
       .map((v, i) => v ?? closesRaw[i - 1])
@@ -85,26 +85,12 @@ async function fetchSingleStock(symbol) {
 
     if (!closes.length) return null;
 
-    const current = closes.at(-1);
-    const prevClose = closes.at(-2);
+    const current = meta.regularMarketPrice;
+    const prevClose = meta.chartPreviousClose;
 
     const weekAgo = closes.at(Math.max(closes.length - 6, 0));
     const monthAgo = closes.at(Math.max(closes.length - 22, 0));
     const threeMonthAgo = closes.at(Math.max(closes.length - 66, 0));
-
-    /* -------- FUNDAMENTALS (CORRECT ENDPOINT) -------- */
-    const quoteData = await yahooGET(
-      `https://query1.finance.yahoo.com/v7/finance/quote?symbols=${safe}`
-    );
-
-    let marketCap = null;
-    let pe = null;
-
-    if (quoteData?.quoteResponse?.result?.[0]) {
-      const q = quoteData.quoteResponse.result[0];
-      marketCap = q.marketCap ?? null;
-      pe = q.trailingPE ?? null;
-    }
 
     return {
       symbol,
@@ -112,20 +98,24 @@ async function fetchSingleStock(symbol) {
 
       /* 1D */
       dayChange: prevClose ? current - prevClose : null,
-      changePercent: pct(current, prevClose),
+      changePercent: prevClose
+        ? ((current - prevClose) / prevClose) * 100
+        : null,
 
       /* 1W / 1M / 3M */
-      weekChange: pct(current, weekAgo),
-      monthChange: pct(current, monthAgo),
-      threeMonthChange: pct(current, threeMonthAgo),
+      weekChange: weekAgo ? ((current - weekAgo) / weekAgo) * 100 : null,
+      monthChange: monthAgo ? ((current - monthAgo) / monthAgo) * 100 : null,
+      threeMonthChange: threeMonthAgo
+        ? ((current - threeMonthAgo) / threeMonthAgo) * 100
+        : null,
 
-      /* Fundamentals */
-      marketCap,
-      pe,
+      /* ✅ MARKET CAP & PE FROM META */
+      marketCap: meta.marketCap ?? null,
+      pe: meta.trailingPE ?? null,
 
       /* 52W */
-      high52: Math.max(...closes.slice(-252)),
-      low52: Math.min(...closes.slice(-252))
+      high52: meta.fiftyTwoWeekHigh ?? Math.max(...closes.slice(-252)),
+      low52: meta.fiftyTwoWeekLow ?? Math.min(...closes.slice(-252))
     };
 
   } catch (e) {
