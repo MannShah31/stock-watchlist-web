@@ -69,9 +69,7 @@ async function fetchSingleStock(symbol) {
   try {
     const safe = encodeURIComponent(symbol.trim());
 
-    /* =========================
-       1️⃣ PRICE HISTORY (1Y)
-    ========================== */
+    /* ========= 1️⃣ PRICE HISTORY ========= */
     const chartData = await yahooGET(
       `https://query1.finance.yahoo.com/v8/finance/chart/${safe}?range=1y&interval=1d`
     );
@@ -94,35 +92,28 @@ async function fetchSingleStock(symbol) {
     const monthAgo = closes.at(Math.max(closes.length - 22, 0));
     const threeMonthAgo = closes.at(Math.max(closes.length - 66, 0));
 
-    /* =========================
-       2️⃣ FUNDAMENTALS (WORKING)
-    ========================== */
-    const quoteData = await yahooGET(
-      `https://query1.finance.yahoo.com/v7/finance/quote?symbols=${safe}`
+    /* ========= 2️⃣ FUNDAMENTALS (WORKING FIX) ========= */
+    const fundamentals = await yahooGET(
+      `https://query2.finance.yahoo.com/v10/finance/quoteSummary/${safe}?modules=price`
     );
 
-    const quote = quoteData?.quoteResponse?.result?.[0];
+    const priceModule =
+      fundamentals?.quoteSummary?.result?.[0]?.price;
 
-    const marketCap = quote?.marketCap ?? null;
-    const pe = quote?.trailingPE ?? null;
+    const marketCap = priceModule?.marketCap?.raw ?? null;
+    const pe = priceModule?.trailingPE?.raw ?? null;
 
-    /* =========================
-       RETURN CLEAN OBJECT
-    ========================== */
+    /* ========= RETURN CLEAN OBJECT ========= */
     return {
       symbol,
       price: current,
 
       dayChange: prevClose ? current - prevClose : null,
-      changePercent: prevClose
-        ? ((current - prevClose) / prevClose) * 100
-        : null,
+      changePercent: pct(current, prevClose),
 
-      weekChange: weekAgo ? ((current - weekAgo) / weekAgo) * 100 : null,
-      monthChange: monthAgo ? ((current - monthAgo) / monthAgo) * 100 : null,
-      threeMonthChange: threeMonthAgo
-        ? ((current - threeMonthAgo) / threeMonthAgo) * 100
-        : null,
+      weekChange: pct(current, weekAgo),
+      monthChange: pct(current, monthAgo),
+      threeMonthChange: pct(current, threeMonthAgo),
 
       marketCap,
       pe,
@@ -136,6 +127,7 @@ async function fetchSingleStock(symbol) {
     return null;
   }
 }
+
 /* =====================
    ALERT ENGINE
 ===================== */
