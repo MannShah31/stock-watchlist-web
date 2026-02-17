@@ -69,7 +69,8 @@ export function setupWatchlist({
   const cr = v =>
     v === null || v === undefined
       ? "-"
-      : `₹${(v / 1e7).toFixed(2)} Cr`;
+      : v;
+
 
   const cls = v =>
     v === null || v === undefined

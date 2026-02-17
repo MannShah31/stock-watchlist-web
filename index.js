@@ -68,8 +68,11 @@ function pct(current, past) {
 async function fetchSingleStock(symbol) {
   try {
     const safe = encodeURIComponent(symbol.trim());
+    const screenerSymbol = symbol.replace(".NS", "").replace(".BO", "");
 
-    /* ========= 1️⃣ PRICE HISTORY ========= */
+    /* =========================
+       1️⃣ PRICE HISTORY
+    ========================== */
     const chartData = await yahooGET(
       `https://query1.finance.yahoo.com/v8/finance/chart/${safe}?range=1y&interval=1d`
     );
@@ -83,8 +86,6 @@ async function fetchSingleStock(symbol) {
       .map((v, i) => v ?? closesRaw[i - 1])
       .filter(v => v != null);
 
-    if (!closes.length) return null;
-
     const current = closes.at(-1);
     const prevClose = closes.at(-2);
 
@@ -92,28 +93,52 @@ async function fetchSingleStock(symbol) {
     const monthAgo = closes.at(Math.max(closes.length - 22, 0));
     const threeMonthAgo = closes.at(Math.max(closes.length - 66, 0));
 
-    /* ========= 2️⃣ FUNDAMENTALS (WORKING FIX) ========= */
-    const fundamentals = await yahooGET(
-      `https://query2.finance.yahoo.com/v10/finance/quoteSummary/${safe}?modules=price`
-    );
+    /* =========================
+       2️⃣ SCRAPE SCREENER
+    ========================== */
+    const html = await new Promise(resolve => {
+      https.get(
+        `https://www.screener.in/company/${screenerSymbol}/`,
+        { headers: { "User-Agent": "Mozilla/5.0" } },
+        r => {
+          let raw = "";
+          r.on("data", d => (raw += d));
+          r.on("end", () => resolve(raw));
+        }
+      ).on("error", () => resolve(null));
+    });
 
-    const priceModule =
-      fundamentals?.quoteSummary?.result?.[0]?.price;
+    let marketCap = null;
+    let pe = null;
 
-    const marketCap = priceModule?.marketCap?.raw ?? null;
-    const pe = priceModule?.trailingPE?.raw ?? null;
+    if (html) {
+      const mcapMatch = html.match(/Market Cap<\/span>\s*<span[^>]*>([^<]+)/);
+      const peMatch = html.match(/Stock P\/E<\/span>\s*<span[^>]*>([^<]+)/);
 
-    /* ========= RETURN CLEAN OBJECT ========= */
+      if (mcapMatch) marketCap = mcapMatch[1].trim();
+      if (peMatch) pe = peMatch[1].trim();
+    }
+
     return {
       symbol,
       price: current,
 
       dayChange: prevClose ? current - prevClose : null,
-      changePercent: pct(current, prevClose),
+      changePercent: prevClose
+        ? ((current - prevClose) / prevClose) * 100
+        : null,
 
-      weekChange: pct(current, weekAgo),
-      monthChange: pct(current, monthAgo),
-      threeMonthChange: pct(current, threeMonthAgo),
+      weekChange: weekAgo
+        ? ((current - weekAgo) / weekAgo) * 100
+        : null,
+
+      monthChange: monthAgo
+        ? ((current - monthAgo) / monthAgo) * 100
+        : null,
+
+      threeMonthChange: threeMonthAgo
+        ? ((current - threeMonthAgo) / threeMonthAgo) * 100
+        : null,
 
       marketCap,
       pe,
