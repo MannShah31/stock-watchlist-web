@@ -103,7 +103,6 @@ app.get("/upstock/callback", (req, res) => {
 ===================== */
 app.get("/upstock/sync-stocks", async (req, res) => {
   try {
-
     const token = process.env.UPSTOX_ACCESS_TOKEN;
 
     if (!token) {
@@ -122,43 +121,15 @@ app.get("/upstock/sync-stocks", async (req, res) => {
     https.request(options, response => {
       let data = "";
 
+      console.log("Status Code:", response.statusCode);
+
       response.on("data", chunk => (data += chunk));
 
       response.on("end", () => {
-        try {
-          const parsed = JSON.parse(data);
+        console.log("RAW RESPONSE:");
+        console.log(data);
 
-          if (!parsed.data) {
-            console.log(parsed);
-            return res.status(500).send("Invalid response from Upstox");
-          }
-
-          const all = parsed.data
-            .filter(i =>
-              i.exchange === "NSE_EQ" ||
-              i.exchange === "BSE_EQ"
-            )
-            .map(i => ({
-              symbol: i.trading_symbol,
-              name: i.name
-            }));
-
-          fs.writeFileSync(
-            path.join(__dirname, "stocks.json"),
-            JSON.stringify(all, null, 2)
-          );
-
-          console.log("✅ Total stocks:", all.length);
-
-          res.json({
-            message: "stocks.json updated",
-            total: all.length
-          });
-
-        } catch (e) {
-          console.error("Parse error:", e);
-          res.status(500).send("Failed to parse Upstox response");
-        }
+        res.send("Check Render logs for full Upstox response.");
       });
 
     }).end();
