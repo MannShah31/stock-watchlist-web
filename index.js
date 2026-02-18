@@ -178,6 +178,20 @@ app.get("/upstock/sync-stocks", async (req, res) => {
     res.status(500).send("Failed to sync stocks");
   }
 });
+/* =====================
+   STOCK MASTER API
+===================== */
+app.get("/api/stocks", (_, res) => {
+  try {
+    const data = JSON.parse(
+      fs.readFileSync(path.join(__dirname, "stocks.json"), "utf8")
+    );
+    res.json(data);
+  } catch (e) {
+    console.error("Failed to read stocks.json", e);
+    res.status(500).json([]);
+  }
+});
 
 
 /* =====================

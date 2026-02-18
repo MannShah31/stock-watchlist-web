@@ -120,6 +120,8 @@ setupAuth({
 
     window.allStocks = await getAllStocks();
 
+    console.log("Loaded stocks count:", window.allStocks?.length);
+
     const snap = await getDoc(doc(db, "users", userId));
     watchlist = snap.exists() ? snap.data().watchlist || [] : [];
 
