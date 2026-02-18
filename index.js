@@ -4,6 +4,7 @@ const fs = require("fs");
 const path = require("path");
 const nodemailer = require("nodemailer");
 const admin = require("firebase-admin");
+const zlib = require("zlib");
 
 const app = express();
 app.use(express.json());
@@ -36,7 +37,7 @@ const transporter = nodemailer.createTransport({
 });
 
 /* =====================
-   🔐 UPSTOX LOGIN ROUTE
+   🔐 UPSTOX LOGIN
 ===================== */
 app.get("/upstock/login", (req, res) => {
   const url =
@@ -54,9 +55,7 @@ app.get("/upstock/login", (req, res) => {
 app.get("/upstock/callback", (req, res) => {
   const code = req.query.code;
 
-  if (!code) {
-    return res.send("No authorization code received");
-  }
+  if (!code) return res.send("No authorization code received");
 
   const postData = new URLSearchParams({
     code,
@@ -85,8 +84,8 @@ app.get("/upstock/callback", (req, res) => {
         const parsed = JSON.parse(data);
 
         if (parsed.access_token) {
-          console.log("✅ UPSTOX ACCESS TOKEN:", parsed.access_token);
-          res.send("Upstox connected successfully! Check logs for token.");
+          console.log("✅ ACCESS TOKEN:", parsed.access_token);
+          res.send("Upstox connected. Save access_token to env.");
         } else {
           res.send(parsed);
         }
@@ -101,45 +100,23 @@ app.get("/upstock/callback", (req, res) => {
 });
 
 /* =====================
-   🧪 TEST UPSTOX PROFILE
-===================== */
-app.get("/upstock/profile", (req, res) => {
-  const token = process.env.UPSTOX_ACCESS_TOKEN;
-
-  if (!token) {
-    return res.send("Access token not set in environment variables");
-  }
-
-  const options = {
-    hostname: "api.upstox.com",
-    path: "/v2/user/profile",
-    method: "GET",
-    headers: {
-      Authorization: `Bearer ${token}`
-    }
-  };
-
-  https.request(options, response => {
-    let data = "";
-    response.on("data", chunk => (data += chunk));
-    response.on("end", () => {
-      res.send(data);
-    });
-  }).end();
-});
-/* =====================
    📥 DOWNLOAD ALL NSE/BSE STOCKS
-===================== */
-const zlib = require("zlib");
-
-/* =====================
-   📥 DOWNLOAD NSE + BSE MASTER
 ===================== */
 app.get("/upstock/sync-stocks", async (req, res) => {
   try {
+
     async function downloadAndExtract(url) {
       return new Promise((resolve, reject) => {
+        console.log("Downloading:", url);
+
         https.get(url, response => {
+
+          if (response.statusCode !== 200) {
+            return reject(
+              new Error("Bad status: " + response.statusCode)
+            );
+          }
+
           const chunks = [];
 
           response.on("data", chunk => chunks.push(chunk));
@@ -158,26 +135,38 @@ app.get("/upstock/sync-stocks", async (req, res) => {
               }
             });
           });
+
         }).on("error", reject);
       });
     }
 
-    console.log("Downloading NSE...");
-    const nse = await downloadAndExtract(
-      "https://assets.upstox.com/market-quote/instruments/exchange/NSE.json.gz"
-    );
+    const NSE_URL =
+      "https://assets.upstox.com/market-quote/instruments/exchange/NSE.json.gz";
 
-    console.log("Downloading BSE...");
-    const bse = await downloadAndExtract(
-      "https://assets.upstox.com/market-quote/instruments/exchange/BSE.json.gz"
-    );
+    const BSE_URL =
+      "https://assets.upstox.com/market-quote/instruments/exchange/BSE.json.gz";
+
+    const nse = await downloadAndExtract(NSE_URL);
+    const bse = await downloadAndExtract(BSE_URL);
+
+    console.log("NSE instruments:", nse.length);
+    console.log("BSE instruments:", bse.length);
 
     const all = [...nse, ...bse]
-      .filter(i => i.segment === "EQ")
+      .filter(i =>
+        i.segment === "NSE_EQ" ||
+        i.segment === "BSE_EQ"
+      )
       .map(i => ({
         symbol: i.trading_symbol,
         name: i.name
       }));
+
+    console.log("Final stock count:", all.length);
+
+    if (!all.length) {
+      throw new Error("No EQ stocks found");
+    }
 
     fs.writeFileSync(
       path.join(__dirname, "stocks.json"),
@@ -185,16 +174,15 @@ app.get("/upstock/sync-stocks", async (req, res) => {
     );
 
     res.json({
-      message: "stocks.json updated",
+      success: true,
       total: all.length
     });
 
   } catch (e) {
-    console.error(e);
+    console.error("SYNC ERROR:", e.message);
     res.status(500).send("Failed to sync stocks");
   }
 });
-
 
 /* =====================
    START SERVER
