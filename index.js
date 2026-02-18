@@ -127,6 +127,61 @@ app.get("/upstock/profile", (req, res) => {
     });
   }).end();
 });
+/* =====================
+   📥 DOWNLOAD ALL NSE/BSE STOCKS
+===================== */
+app.get("/upstock/sync-stocks", (req, res) => {
+  const token = process.env.UPSTOX_ACCESS_TOKEN;
+
+  if (!token) {
+    return res.send("Access token missing");
+  }
+
+  const options = {
+    hostname: "api.upstox.com",
+    path: "/v2/market/instruments",
+    method: "GET",
+    headers: {
+      Authorization: `Bearer ${token}`
+    }
+  };
+
+  https.request(options, response => {
+    let data = "";
+    response.on("data", chunk => (data += chunk));
+    response.on("end", () => {
+      try {
+        const parsed = JSON.parse(data);
+
+        if (!parsed.data) {
+          return res.send(parsed);
+        }
+
+        const stocks = parsed.data
+          .filter(i =>
+            i.exchange === "NSE_EQ" || i.exchange === "BSE_EQ"
+          )
+          .map(i => ({
+            symbol: i.trading_symbol,
+            name: i.name
+          }));
+
+        fs.writeFileSync(
+          path.join(__dirname, "stocks.json"),
+          JSON.stringify(stocks, null, 2)
+        );
+
+        res.send({
+          message: "stocks.json updated",
+          total: stocks.length
+        });
+
+      } catch (e) {
+        res.send(data);
+      }
+    });
+  }).end();
+});
 
 /* =====================
    START SERVER
