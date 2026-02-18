@@ -54,7 +54,6 @@ app.get("/upstock/login", (req, res) => {
 ===================== */
 app.get("/upstock/callback", (req, res) => {
   const code = req.query.code;
-
   if (!code) return res.send("No authorization code received");
 
   const postData = new URLSearchParams({
@@ -100,10 +99,8 @@ app.get("/upstock/callback", (req, res) => {
 });
 
 /* =====================
-   📥 DOWNLOAD ALL NSE/BSE STOCKS
+   📥 SYNC NSE + BSE STOCKS
 ===================== */
-const zlib = require("zlib");
-
 app.get("/upstock/sync-stocks", async (req, res) => {
   try {
 
@@ -113,8 +110,6 @@ app.get("/upstock/sync-stocks", async (req, res) => {
         console.log("Downloading:", url);
 
         https.get(url, response => {
-
-          console.log("Status:", response.statusCode);
 
           if (response.statusCode !== 200) {
             return reject("Bad status: " + response.statusCode);
@@ -128,15 +123,12 @@ app.get("/upstock/sync-stocks", async (req, res) => {
             const buffer = Buffer.concat(chunks);
 
             zlib.gunzip(buffer, (err, decoded) => {
-              if (err) {
-                console.error("Gunzip error:", err);
-                return reject(err);
-              }
+              if (err) return reject(err);
 
               try {
                 const json = JSON.parse(decoded.toString());
                 resolve(json);
-              } catch (e) {
+              } catch {
                 reject("JSON parse error");
               }
             });
@@ -147,7 +139,6 @@ app.get("/upstock/sync-stocks", async (req, res) => {
       });
     }
 
-    // ✅ NEW WORKING URLS
     const nse = await download(
       "https://assets.upstox.com/instruments/NSE.json.gz"
     );
@@ -155,9 +146,6 @@ app.get("/upstock/sync-stocks", async (req, res) => {
     const bse = await download(
       "https://assets.upstox.com/instruments/BSE.json.gz"
     );
-
-    console.log("NSE count:", nse.length);
-    console.log("BSE count:", bse.length);
 
     const all = [...nse, ...bse]
       .filter(i =>
@@ -168,12 +156,12 @@ app.get("/upstock/sync-stocks", async (req, res) => {
         name: i.name
       }));
 
-    console.log("Final EQ stocks:", all.length);
-
     fs.writeFileSync(
       path.join(__dirname, "stocks.json"),
       JSON.stringify(all, null, 2)
     );
+
+    console.log("✅ Total EQ stocks:", all.length);
 
     res.json({
       message: "stocks.json updated",
@@ -185,7 +173,6 @@ app.get("/upstock/sync-stocks", async (req, res) => {
     res.status(500).send("Failed to sync stocks");
   }
 });
-
 
 /* =====================
    START SERVER
