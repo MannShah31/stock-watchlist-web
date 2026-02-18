@@ -103,36 +103,75 @@ app.get("/upstock/callback", (req, res) => {
 ===================== */
 app.get("/upstock/sync-stocks", async (req, res) => {
   try {
-    const token = process.env.UPSTOX_ACCESS_TOKEN;
 
-    if (!token) {
-      return res.status(400).send("UPSTOX_ACCESS_TOKEN not set");
+    function download(url) {
+      return new Promise((resolve, reject) => {
+
+        const options = {
+          headers: {
+            "User-Agent": "Mozilla/5.0"
+          }
+        };
+
+        https.get(url, options, response => {
+
+          console.log("Status:", response.statusCode);
+
+          if (response.statusCode !== 200) {
+            return reject("Bad status: " + response.statusCode);
+          }
+
+          const chunks = [];
+
+          response.on("data", chunk => chunks.push(chunk));
+
+          response.on("end", () => {
+            const buffer = Buffer.concat(chunks);
+
+            zlib.gunzip(buffer, (err, decoded) => {
+              if (err) return reject(err);
+
+              try {
+                const json = JSON.parse(decoded.toString());
+                resolve(json);
+              } catch (e) {
+                reject(e);
+              }
+            });
+          });
+
+        }).on("error", reject);
+      });
     }
 
-    const options = {
-      hostname: "api.upstox.com",
-      path: "/v2/instruments",
-      method: "GET",
-      headers: {
-        Authorization: `Bearer ${token}`
-      }
-    };
+    console.log("Downloading NSE...");
+    const nse = await download(
+      "https://assets.upstox.com/market-quote/instruments/exchange/NSE.json.gz"
+    );
 
-    https.request(options, response => {
-      let data = "";
+    console.log("Downloading BSE...");
+    const bse = await download(
+      "https://assets.upstox.com/market-quote/instruments/exchange/BSE.json.gz"
+    );
 
-      console.log("Status Code:", response.statusCode);
+    const all = [...nse, ...bse]
+      .filter(i => i.segment === "NSE_EQ" || i.segment === "BSE_EQ")
+      .map(i => ({
+        symbol: i.trading_symbol,
+        name: i.name
+      }));
 
-      response.on("data", chunk => (data += chunk));
+    fs.writeFileSync(
+      path.join(__dirname, "stocks.json"),
+      JSON.stringify(all, null, 2)
+    );
 
-      response.on("end", () => {
-        console.log("RAW RESPONSE:");
-        console.log(data);
+    console.log("Total stocks:", all.length);
 
-        res.send("Check Render logs for full Upstox response.");
-      });
-
-    }).end();
+    res.json({
+      message: "stocks.json updated",
+      total: all.length
+    });
 
   } catch (e) {
     console.error("SYNC ERROR:", e);
