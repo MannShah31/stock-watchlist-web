@@ -26,160 +26,110 @@ if (!admin.apps.length) {
 const fdb = admin.firestore();
 
 /* =====================
-   SMTP CONFIG
+   HELPER
 ===================== */
-const transporter = nodemailer.createTransport({
-  service: "gmail",
-  auth: {
-    user: process.env.EMAIL_USER,
-    pass: process.env.EMAIL_PASS
-  }
-});
-
-/* =====================
-   🔐 UPSTOX LOGIN
-===================== */
-app.get("/upstock/login", (req, res) => {
-  const url =
-    `https://api.upstox.com/v2/login/authorization/dialog` +
-    `?response_type=code` +
-    `&client_id=${process.env.UPSTOX_CLIENT_ID}` +
-    `&redirect_uri=${process.env.UPSTOX_REDIRECT_URI}`;
-
-  res.redirect(url);
-});
-
-/* =====================
-   🔄 UPSTOX CALLBACK
-===================== */
-app.get("/upstock/callback", (req, res) => {
-  const code = req.query.code;
-  if (!code) return res.send("No authorization code received");
-
-  const postData = new URLSearchParams({
-    code,
-    client_id: process.env.UPSTOX_CLIENT_ID,
-    client_secret: process.env.UPSTOX_CLIENT_SECRET,
-    redirect_uri: process.env.UPSTOX_REDIRECT_URI,
-    grant_type: "authorization_code"
-  }).toString();
-
-  const options = {
-    hostname: "api.upstox.com",
-    path: "/v2/login/authorization/token",
-    method: "POST",
-    headers: {
-      "Content-Type": "application/x-www-form-urlencoded",
-      "Content-Length": postData.length
-    }
-  };
-
-  const request = https.request(options, response => {
-    let data = "";
-
-    response.on("data", chunk => (data += chunk));
-    response.on("end", () => {
-      try {
-        const parsed = JSON.parse(data);
-
-        if (parsed.access_token) {
-          console.log("✅ ACCESS TOKEN:", parsed.access_token);
-          res.send("Upstox connected. Save access_token to env.");
-        } else {
-          res.send(parsed);
-        }
-      } catch {
-        res.send(data);
+function yahooGET(url) {
+  return new Promise(resolve => {
+    https.get(
+      url,
+      { headers: { "User-Agent": "Mozilla/5.0" } },
+      r => {
+        let raw = "";
+        r.on("data", d => (raw += d));
+        r.on("end", () => {
+          try {
+            resolve(JSON.parse(raw));
+          } catch {
+            resolve(null);
+          }
+        });
       }
-    });
+    ).on("error", () => resolve(null));
   });
+}
 
-  request.write(postData);
-  request.end();
-});
+function pct(current, past) {
+  if (!current || !past) return null;
+  return ((current - past) / past) * 100;
+}
 
 /* =====================
-   📥 SYNC NSE + BSE STOCKS
+   FETCH STOCK DATA
 ===================== */
-app.get("/upstock/sync-stocks", async (req, res) => {
+async function fetchSingleStock(symbol) {
   try {
+    const safe = encodeURIComponent(symbol.trim());
 
-    function download(url) {
-      return new Promise((resolve, reject) => {
-
-        const options = {
-          headers: {
-            "User-Agent": "Mozilla/5.0"
-          }
-        };
-
-        https.get(url, options, response => {
-
-          console.log("Status:", response.statusCode);
-
-          if (response.statusCode !== 200) {
-            return reject("Bad status: " + response.statusCode);
-          }
-
-          const chunks = [];
-
-          response.on("data", chunk => chunks.push(chunk));
-
-          response.on("end", () => {
-            const buffer = Buffer.concat(chunks);
-
-            zlib.gunzip(buffer, (err, decoded) => {
-              if (err) return reject(err);
-
-              try {
-                const json = JSON.parse(decoded.toString());
-                resolve(json);
-              } catch (e) {
-                reject(e);
-              }
-            });
-          });
-
-        }).on("error", reject);
-      });
-    }
-
-    console.log("Downloading NSE...");
-    const nse = await download(
-      "https://assets.upstox.com/market-quote/instruments/exchange/NSE.json.gz"
+    // PRICE HISTORY
+    const chartData = await yahooGET(
+      `https://query1.finance.yahoo.com/v8/finance/chart/${safe}?range=1y&interval=1d`
     );
 
-    console.log("Downloading BSE...");
-    const bse = await download(
-      "https://assets.upstox.com/market-quote/instruments/exchange/BSE.json.gz"
+    if (!chartData?.chart?.result?.[0]) return null;
+
+    const chart = chartData.chart.result[0];
+    const closesRaw = chart.indicators.quote[0].close;
+
+    const closes = closesRaw
+      .map((v, i) => v ?? closesRaw[i - 1])
+      .filter(v => v != null);
+
+    const current = closes.at(-1);
+    const prevClose = closes.at(-2);
+
+    const weekAgo = closes.at(Math.max(closes.length - 6, 0));
+    const monthAgo = closes.at(Math.max(closes.length - 22, 0));
+    const threeMonthAgo = closes.at(Math.max(closes.length - 66, 0));
+
+    // FUNDAMENTALS (WORKING METHOD)
+    const quoteData = await yahooGET(
+      `https://query1.finance.yahoo.com/v7/finance/quote?symbols=${safe}`
     );
 
-    const all = [...nse, ...bse]
-      .filter(i => i.segment === "NSE_EQ" || i.segment === "BSE_EQ")
-      .map(i => ({
-        symbol: i.trading_symbol,
-        name: i.name
-      }));
+    const quote = quoteData?.quoteResponse?.result?.[0];
 
-    fs.writeFileSync(
-      path.join(__dirname, "stocks.json"),
-      JSON.stringify(all, null, 2)
-    );
+    return {
+      symbol,
+      price: current,
 
-    console.log("Total stocks:", all.length);
+      dayChange: prevClose ? current - prevClose : null,
+      changePercent: pct(current, prevClose),
 
-    res.json({
-      message: "stocks.json updated",
-      total: all.length
-    });
+      weekChange: pct(current, weekAgo),
+      monthChange: pct(current, monthAgo),
+      threeMonthChange: pct(current, threeMonthAgo),
+
+      marketCap: quote?.marketCap ?? null,
+      pe: quote?.trailingPE ?? null,
+
+      high52: Math.max(...closes.slice(-252)),
+      low52: Math.min(...closes.slice(-252))
+    };
 
   } catch (e) {
-    console.error("SYNC ERROR:", e);
-    res.status(500).send("Failed to sync stocks");
+    console.error("fetchSingleStock error:", e.message);
+    return null;
   }
-});
+}
+
 /* =====================
-   STOCK MASTER API
+   API: PRICES  ✅ RESTORED
+===================== */
+app.get("/api/prices", async (req, res) => {
+  const symbols = req.query.symbols?.split(",").map(s => s.trim());
+  if (!symbols || !symbols.length) {
+    return res.status(400).json({ error: "Missing symbols" });
+  }
+
+  const data = await Promise.all(symbols.map(fetchSingleStock));
+  const out = {};
+  data.forEach(d => d && (out[d.symbol] = d));
+
+  res.json(out);
+});
+
+/* =====================
+   API: STOCK MASTER
 ===================== */
 app.get("/api/stocks", (_, res) => {
   try {
