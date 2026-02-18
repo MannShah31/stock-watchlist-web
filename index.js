@@ -36,211 +36,96 @@ const transporter = nodemailer.createTransport({
 });
 
 /* =====================
-   HELPER: YAHOO GET
+   🔐 UPSTOX LOGIN ROUTE
 ===================== */
-function yahooGET(url) {
-  return new Promise(resolve => {
-    https.get(url, { headers: { "User-Agent": "Mozilla/5.0" } }, r => {
-      let raw = "";
-      r.on("data", d => (raw += d));
-      r.on("end", () => {
-        try {
-          resolve(JSON.parse(raw));
-        } catch {
-          resolve(null);
-        }
-      });
-    }).on("error", () => resolve(null));
-  });
-}
+app.get("/upstock/login", (req, res) => {
+  const url =
+    `https://api.upstox.com/v2/login/authorization/dialog` +
+    `?response_type=code` +
+    `&client_id=${process.env.UPSTOX_CLIENT_ID}` +
+    `&redirect_uri=${process.env.UPSTOX_REDIRECT_URI}`;
 
-/* =====================
-   SAFE % CALC
-===================== */
-function pct(current, past) {
-  if (!current || !past) return null;
-  return ((current - past) / past) * 100;
-}
-
-/* =====================
-   FETCH FULL STOCK DATA
-===================== */
-async function fetchSingleStock(symbol) {
-  try {
-    const safe = encodeURIComponent(symbol.trim());
-    const screenerSymbol = symbol.replace(".NS", "").replace(".BO", "");
-
-    /* =========================
-       1️⃣ PRICE HISTORY
-    ========================== */
-    const chartData = await yahooGET(
-      `https://query1.finance.yahoo.com/v8/finance/chart/${safe}?range=1y&interval=1d`
-    );
-
-    if (!chartData?.chart?.result?.[0]) return null;
-
-    const chart = chartData.chart.result[0];
-    const closesRaw = chart.indicators.quote[0].close;
-
-    const closes = closesRaw
-      .map((v, i) => v ?? closesRaw[i - 1])
-      .filter(v => v != null);
-
-    const current = closes.at(-1);
-    const prevClose = closes.at(-2);
-
-    const weekAgo = closes.at(Math.max(closes.length - 6, 0));
-    const monthAgo = closes.at(Math.max(closes.length - 22, 0));
-    const threeMonthAgo = closes.at(Math.max(closes.length - 66, 0));
-
-    /* =========================
-       2️⃣ SCRAPE SCREENER
-    ========================== */
-    const html = await new Promise(resolve => {
-      https.get(
-        `https://www.screener.in/company/${screenerSymbol}/`,
-        { headers: { "User-Agent": "Mozilla/5.0" } },
-        r => {
-          let raw = "";
-          r.on("data", d => (raw += d));
-          r.on("end", () => resolve(raw));
-        }
-      ).on("error", () => resolve(null));
-    });
-
-    let marketCap = null;
-    let pe = null;
-
-    if (html) {
-      const mcapMatch = html.match(/Market Cap<\/span>\s*<span[^>]*>([^<]+)/);
-      const peMatch = html.match(/Stock P\/E<\/span>\s*<span[^>]*>([^<]+)/);
-
-      if (mcapMatch) marketCap = mcapMatch[1].trim();
-      if (peMatch) pe = peMatch[1].trim();
-    }
-
-    return {
-      symbol,
-      price: current,
-
-      dayChange: prevClose ? current - prevClose : null,
-      changePercent: prevClose
-        ? ((current - prevClose) / prevClose) * 100
-        : null,
-
-      weekChange: weekAgo
-        ? ((current - weekAgo) / weekAgo) * 100
-        : null,
-
-      monthChange: monthAgo
-        ? ((current - monthAgo) / monthAgo) * 100
-        : null,
-
-      threeMonthChange: threeMonthAgo
-        ? ((current - threeMonthAgo) / threeMonthAgo) * 100
-        : null,
-
-      marketCap,
-      pe,
-
-      high52: Math.max(...closes.slice(-252)),
-      low52: Math.min(...closes.slice(-252))
-    };
-
-  } catch (e) {
-    console.error("❌ fetchSingleStock error:", symbol, e.message);
-    return null;
-  }
-}
-
-/* =====================
-   ALERT ENGINE
-===================== */
-async function checkAllAlerts() {
-  try {
-    const users = await fdb.collection("users").get();
-
-    for (const u of users.docs) {
-      const snap = await fdb
-        .collection("users")
-        .doc(u.id)
-        .collection("alerts")
-        .where("triggered", "==", false)
-        .get();
-
-      if (snap.empty) continue;
-
-      const alerts = snap.docs.map(d => ({
-        id: d.id,
-        uid: u.id,
-        ...d.data()
-      }));
-
-      const symbols = [...new Set(alerts.map(a => a.symbol))];
-      const pricesArr = await Promise.all(symbols.map(fetchSingleStock));
-
-      const prices = {};
-      pricesArr.forEach(p => p && (prices[p.symbol] = p));
-
-      for (const a of alerts) {
-        const d = prices[a.symbol];
-        if (!d || !d.price) continue;
-
-        if (d.price >= a.price) {
-          await transporter.sendMail({
-            from: `"Stock Watchlist" <${process.env.EMAIL_USER}>`,
-            to: a.email,
-            subject: `🔔 Alert Triggered: ${a.symbol}`,
-            html: `
-              <h3>Alert Triggered</h3>
-              <p><b>${a.symbol}</b></p>
-              <p>Target: ₹${a.price}</p>
-              <p>Current: ₹${d.price.toFixed(2)}</p>
-            `
-          });
-
-          await fdb
-            .collection("users")
-            .doc(a.uid)
-            .collection("alerts")
-            .doc(a.id)
-            .update({
-              triggered: true,
-              triggeredAt: admin.firestore.FieldValue.serverTimestamp()
-            });
-        }
-      }
-    }
-  } catch (e) {
-    console.error("❌ Alert engine error:", e.message);
-  }
-}
-
-setInterval(checkAllAlerts, 60 * 1000);
-
-/* =====================
-   API: PRICES
-===================== */
-app.get("/api/prices", async (req, res) => {
-  const symbols = req.query.symbols?.split(",").map(s => s.trim());
-  if (!symbols || !symbols.length) {
-    return res.status(400).json({ error: "Missing symbols" });
-  }
-
-  const data = await Promise.all(symbols.map(fetchSingleStock));
-  const out = {};
-  data.forEach(d => d && (out[d.symbol] = d));
-
-  res.json(out);
+  res.redirect(url);
 });
 
 /* =====================
-   STOCK MASTER
+   🔄 UPSTOX CALLBACK
 ===================== */
-app.get("/api/stocks", (_, res) => {
-  res.json(
-    JSON.parse(fs.readFileSync(path.join(__dirname, "stocks.json"), "utf8"))
-  );
+app.get("/upstock/callback", (req, res) => {
+  const code = req.query.code;
+
+  if (!code) {
+    return res.send("No authorization code received");
+  }
+
+  const postData = new URLSearchParams({
+    code,
+    client_id: process.env.UPSTOX_CLIENT_ID,
+    client_secret: process.env.UPSTOX_CLIENT_SECRET,
+    redirect_uri: process.env.UPSTOX_REDIRECT_URI,
+    grant_type: "authorization_code"
+  }).toString();
+
+  const options = {
+    hostname: "api.upstox.com",
+    path: "/v2/login/authorization/token",
+    method: "POST",
+    headers: {
+      "Content-Type": "application/x-www-form-urlencoded",
+      "Content-Length": postData.length
+    }
+  };
+
+  const request = https.request(options, response => {
+    let data = "";
+
+    response.on("data", chunk => (data += chunk));
+    response.on("end", () => {
+      try {
+        const parsed = JSON.parse(data);
+
+        if (parsed.access_token) {
+          console.log("✅ UPSTOX ACCESS TOKEN:", parsed.access_token);
+          res.send("Upstox connected successfully! Check logs for token.");
+        } else {
+          res.send(parsed);
+        }
+      } catch {
+        res.send(data);
+      }
+    });
+  });
+
+  request.write(postData);
+  request.end();
+});
+
+/* =====================
+   🧪 TEST UPSTOX PROFILE
+===================== */
+app.get("/upstock/profile", (req, res) => {
+  const token = process.env.UPSTOX_ACCESS_TOKEN;
+
+  if (!token) {
+    return res.send("Access token not set in environment variables");
+  }
+
+  const options = {
+    hostname: "api.upstox.com",
+    path: "/v2/user/profile",
+    method: "GET",
+    headers: {
+      Authorization: `Bearer ${token}`
+    }
+  };
+
+  https.request(options, response => {
+    let data = "";
+    response.on("data", chunk => (data += chunk));
+    response.on("end", () => {
+      res.send(data);
+    });
+  }).end();
 });
 
 /* =====================
