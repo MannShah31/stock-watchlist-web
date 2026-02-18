@@ -104,75 +104,71 @@ app.get("/upstock/callback", (req, res) => {
 app.get("/upstock/sync-stocks", async (req, res) => {
   try {
 
-    async function download(url) {
-      return new Promise((resolve, reject) => {
+    const token = process.env.UPSTOX_ACCESS_TOKEN;
 
-        console.log("Downloading:", url);
-
-        https.get(url, response => {
-
-          if (response.statusCode !== 200) {
-            return reject("Bad status: " + response.statusCode);
-          }
-
-          const chunks = [];
-
-          response.on("data", chunk => chunks.push(chunk));
-
-          response.on("end", () => {
-            const buffer = Buffer.concat(chunks);
-
-            zlib.gunzip(buffer, (err, decoded) => {
-              if (err) return reject(err);
-
-              try {
-                const json = JSON.parse(decoded.toString());
-                resolve(json);
-              } catch {
-                reject("JSON parse error");
-              }
-            });
-          });
-
-        }).on("error", reject);
-
-      });
+    if (!token) {
+      return res.status(400).send("UPSTOX_ACCESS_TOKEN not set");
     }
 
-    const nse = await download(
-      "https://assets.upstox.com/instruments/NSE.json.gz"
-    );
+    const options = {
+      hostname: "api.upstox.com",
+      path: "/v2/instruments",
+      method: "GET",
+      headers: {
+        Authorization: `Bearer ${token}`
+      }
+    };
 
-    const bse = await download(
-      "https://assets.upstox.com/instruments/BSE.json.gz"
-    );
+    https.request(options, response => {
+      let data = "";
 
-    const all = [...nse, ...bse]
-      .filter(i =>
-        i.segment === "NSE_EQ" || i.segment === "BSE_EQ"
-      )
-      .map(i => ({
-        symbol: i.trading_symbol,
-        name: i.name
-      }));
+      response.on("data", chunk => (data += chunk));
 
-    fs.writeFileSync(
-      path.join(__dirname, "stocks.json"),
-      JSON.stringify(all, null, 2)
-    );
+      response.on("end", () => {
+        try {
+          const parsed = JSON.parse(data);
 
-    console.log("✅ Total EQ stocks:", all.length);
+          if (!parsed.data) {
+            console.log(parsed);
+            return res.status(500).send("Invalid response from Upstox");
+          }
 
-    res.json({
-      message: "stocks.json updated",
-      total: all.length
-    });
+          const all = parsed.data
+            .filter(i =>
+              i.exchange === "NSE_EQ" ||
+              i.exchange === "BSE_EQ"
+            )
+            .map(i => ({
+              symbol: i.trading_symbol,
+              name: i.name
+            }));
+
+          fs.writeFileSync(
+            path.join(__dirname, "stocks.json"),
+            JSON.stringify(all, null, 2)
+          );
+
+          console.log("✅ Total stocks:", all.length);
+
+          res.json({
+            message: "stocks.json updated",
+            total: all.length
+          });
+
+        } catch (e) {
+          console.error("Parse error:", e);
+          res.status(500).send("Failed to parse Upstox response");
+        }
+      });
+
+    }).end();
 
   } catch (e) {
     console.error("SYNC ERROR:", e);
     res.status(500).send("Failed to sync stocks");
   }
 });
+
 
 /* =====================
    START SERVER
