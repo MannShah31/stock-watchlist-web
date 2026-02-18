@@ -102,19 +102,22 @@ app.get("/upstock/callback", (req, res) => {
 /* =====================
    📥 DOWNLOAD ALL NSE/BSE STOCKS
 ===================== */
+const zlib = require("zlib");
+
 app.get("/upstock/sync-stocks", async (req, res) => {
   try {
 
-    async function downloadAndExtract(url) {
+    async function download(url) {
       return new Promise((resolve, reject) => {
+
         console.log("Downloading:", url);
 
         https.get(url, response => {
 
+          console.log("Status:", response.statusCode);
+
           if (response.statusCode !== 200) {
-            return reject(
-              new Error("Bad status: " + response.statusCode)
-            );
+            return reject("Bad status: " + response.statusCode);
           }
 
           const chunks = [];
@@ -125,48 +128,47 @@ app.get("/upstock/sync-stocks", async (req, res) => {
             const buffer = Buffer.concat(chunks);
 
             zlib.gunzip(buffer, (err, decoded) => {
-              if (err) return reject(err);
+              if (err) {
+                console.error("Gunzip error:", err);
+                return reject(err);
+              }
 
               try {
                 const json = JSON.parse(decoded.toString());
                 resolve(json);
               } catch (e) {
-                reject(e);
+                reject("JSON parse error");
               }
             });
           });
 
         }).on("error", reject);
+
       });
     }
 
-    const NSE_URL =
-      "https://assets.upstox.com/market-quote/instruments/exchange/NSE.json.gz";
+    // ✅ NEW WORKING URLS
+    const nse = await download(
+      "https://assets.upstox.com/instruments/NSE.json.gz"
+    );
 
-    const BSE_URL =
-      "https://assets.upstox.com/market-quote/instruments/exchange/BSE.json.gz";
+    const bse = await download(
+      "https://assets.upstox.com/instruments/BSE.json.gz"
+    );
 
-    const nse = await downloadAndExtract(NSE_URL);
-    const bse = await downloadAndExtract(BSE_URL);
-
-    console.log("NSE instruments:", nse.length);
-    console.log("BSE instruments:", bse.length);
+    console.log("NSE count:", nse.length);
+    console.log("BSE count:", bse.length);
 
     const all = [...nse, ...bse]
       .filter(i =>
-        i.segment === "NSE_EQ" ||
-        i.segment === "BSE_EQ"
+        i.segment === "NSE_EQ" || i.segment === "BSE_EQ"
       )
       .map(i => ({
         symbol: i.trading_symbol,
         name: i.name
       }));
 
-    console.log("Final stock count:", all.length);
-
-    if (!all.length) {
-      throw new Error("No EQ stocks found");
-    }
+    console.log("Final EQ stocks:", all.length);
 
     fs.writeFileSync(
       path.join(__dirname, "stocks.json"),
@@ -174,15 +176,16 @@ app.get("/upstock/sync-stocks", async (req, res) => {
     );
 
     res.json({
-      success: true,
+      message: "stocks.json updated",
       total: all.length
     });
 
   } catch (e) {
-    console.error("SYNC ERROR:", e.message);
+    console.error("SYNC ERROR:", e);
     res.status(500).send("Failed to sync stocks");
   }
 });
+
 
 /* =====================
    START SERVER
