@@ -86,24 +86,16 @@ async function fetchSingleStock(symbol) {
     const threeMonthAgo = closes.at(Math.max(closes.length - 66, 0));
 
     /* =========================
-       2️⃣ FUNDAMENTALS (Better Endpoint)
+       2️⃣ FUNDAMENTALS (STABLE)
     ========================== */
     const quoteData = await yahooGET(
-      `https://query1.finance.yahoo.com/v10/finance/quoteSummary/${safe}?modules=price,defaultKeyStatistics,summaryDetail`
+      `https://query1.finance.yahoo.com/v7/finance/quote?symbols=${safe}`
     );
 
-    const result = quoteData?.quoteSummary?.result?.[0];
+    const quote = quoteData?.quoteResponse?.result?.[0];
 
-    const marketCap =
-      result?.price?.marketCap?.raw ??
-      result?.defaultKeyStatistics?.marketCap?.raw ??
-      result?.summaryDetail?.marketCap?.raw ??
-      null;
-
-    const pe =
-      result?.summaryDetail?.trailingPE?.raw ??
-      result?.defaultKeyStatistics?.trailingPE?.raw ??
-      null;
+    const marketCap = quote?.marketCap ?? null;
+    const pe = quote?.trailingPE ?? null;
 
     return {
       symbol,
@@ -138,6 +130,7 @@ async function fetchSingleStock(symbol) {
     return null;
   }
 }
+
 
 /* =====================
    API: PRICES  ✅ RESTORED
