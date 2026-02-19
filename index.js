@@ -162,6 +162,56 @@ app.get("/api/stocks", (_, res) => {
     res.status(500).json([]);
   }
 });
+/* =====================
+   📊 INDICES API
+===================== */
+
+const INDICES = {
+  "Nifty 50": "^NSEI",
+  "Nifty Bank": "^NSEBANK",
+  "Sensex": "^BSESN"
+};
+
+async function fetchIndexHistory(symbol) {
+  const data = await yahooGET(
+    `https://query1.finance.yahoo.com/v8/finance/chart/${symbol}?range=2y&interval=1d`
+  );
+
+  if (!data?.chart?.result?.[0]) return null;
+
+  const chart = data.chart.result[0];
+  const closes = chart.indicators.quote[0].close.filter(v => v != null);
+
+  if (!closes.length) return null;
+
+  const current = closes.at(-1);
+  const oneYearAgo = closes.at(-252);
+  const twoYearAgo = closes[0];
+  const oneMonthAgo = closes.at(-22);
+
+  const last52 = closes.slice(-252);
+
+  return {
+    current,
+    oneYearAgo,
+    twoYearAgo,
+    high52: Math.max(...last52),
+    low52: Math.min(...last52),
+    mom: ((current - oneMonthAgo) / oneMonthAgo) * 100,
+    yoy: ((current - oneYearAgo) / oneYearAgo) * 100
+  };
+}
+
+app.get("/api/indices", async (_, res) => {
+  const result = [];
+
+  for (const [name, symbol] of Object.entries(INDICES)) {
+    const data = await fetchIndexHistory(symbol);
+    if (data) result.push({ name, ...data });
+  }
+
+  res.json(result);
+});
 
 /* =====================
    START SERVER
