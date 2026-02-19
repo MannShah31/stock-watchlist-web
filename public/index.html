@@ -75,13 +75,21 @@
     <div class="alert-card">
       <h3>🔔 Price Alerts</h3>
 
-      <div style="display:flex;gap:10px;margin-bottom:14px">
-        <select id="alertSymbol" style="flex:1;padding:10px"></select>
-        <input id="alertPrice" type="number" placeholder="Target Price" style="flex:1;padding:10px">
-        <button id="addAlertBtn">Add</button>
+      <!-- 🔥 FIXED: Proper layout + IDs -->
+      <div class="alert-form">
+        <select id="alertSymbol"></select>
+
+        <input 
+          id="alertPrice" 
+          type="number" 
+          placeholder="Target Price"
+        >
+
+        <button id="addAlertBtn">Add Alert</button>
       </div>
 
-      <div id="alertList"></div>
+      <!-- 🔥 FIXED: Proper container -->
+      <div id="alertList" class="alert-list"></div>
     </div>
   </div>
 
@@ -94,7 +102,7 @@
         <table class="watchlist-table">
           <thead>
             <tr>
-              <th>Stock</th>
+              <th>Index</th>
               <th>Price</th>
               <th>1D ₹</th>
               <th>1W %</th>
@@ -102,10 +110,9 @@
               <th>3M %</th>
               <th>52W High</th>
               <th>52W Low</th>
-              <th></th>
-
             </tr>
           </thead>
+
           <tbody id="indicesTableBody"></tbody>
         </table>
       </div>
@@ -119,11 +126,8 @@
 </div>
 </div>
 
-<!-- ================= EMAILJS ================= -->
-<script src="https://cdn.jsdelivr.net/npm/emailjs-com@3/dist/email.min.js"></script>
-<script>
-  emailjs.init("-nPbEj5p827UiuqEA");
-</script>
+<!-- ================= REMOVE EMAILJS (NOT USED NOW) ================= -->
+<!-- ❌ Removed — was unnecessary and confusing -->
 
 <script type="module" src="/js/app.js"></script>
 </body>

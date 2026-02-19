@@ -128,7 +128,66 @@ async function fetchSingleStock(symbol) {
   }
 }
 
+/* =====================
+   ALERT ENGINE
+===================== */
+async function checkAllAlerts() {
+  try {
+    const users = await fdb.collection("users").get();
 
+    for (const u of users.docs) {
+
+      const alertsSnap = await fdb
+        .collection("users")
+        .doc(u.id)
+        .collection("alerts")
+        .where("triggered", "==", false)
+        .get();
+
+      if (alertsSnap.empty) continue;
+
+      const alerts = alertsSnap.docs.map(d => ({
+        id: d.id,
+        uid: u.id,
+        ...d.data()
+      }));
+
+      const symbols = [...new Set(alerts.map(a => a.symbol))];
+
+      const pricesArr = await Promise.all(symbols.map(fetchSingleStock));
+
+      const prices = {};
+      pricesArr.forEach(p => {
+        if (p) prices[p.symbol] = p;
+      });
+
+      for (const a of alerts) {
+        const d = prices[a.symbol];
+        if (!d || !d.price) continue;
+
+        if (d.price >= a.price) {
+
+          console.log("🔥 ALERT TRIGGERED:", a.symbol);
+
+          await fdb
+            .collection("users")
+            .doc(a.uid)
+            .collection("alerts")
+            .doc(a.id)
+            .update({
+              triggered: true,
+              triggeredAt: admin.firestore.FieldValue.serverTimestamp()
+            });
+        }
+      }
+    }
+  } catch (e) {
+    console.error("Alert engine error:", e.message);
+  }
+}
+
+/* RUN EVERY 1 MIN */
+setInterval(checkAllAlerts, 60 * 1000);
 /* =====================
    API: PRICES  ✅ RESTORED
 ===================== */

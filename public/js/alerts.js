@@ -1,10 +1,11 @@
 import {
+  doc,
   collection,
   addDoc,
   getDocs,
-  deleteDoc,
-  doc
+  updateDoc
 } from "https://www.gstatic.com/firebasejs/12.8.0/firebase-firestore.js";
+
 import { db } from "./firebase.js";
 
 export function setupAlerts({
@@ -16,62 +17,70 @@ export function setupAlerts({
   getWatchlist
 }) {
 
+  /* ---------- POPULATE DROPDOWN ---------- */
   function populateDropdown() {
     alertSymbol.innerHTML = "";
+
     getWatchlist().forEach(s => {
-      const o = document.createElement("option");
-      o.value = s.symbol;
-      o.textContent = `${s.name} (${s.symbol})`;
-      alertSymbol.appendChild(o);
+      const opt = document.createElement("option");
+      opt.value = s.symbol;
+      opt.textContent = `${s.name} (${s.symbol})`;
+      alertSymbol.appendChild(opt);
     });
   }
 
-  addAlertBtn.onclick = async () => {
-    const uid = getUserId();
-    if (!uid) return alert("Not logged in");
+  /* ---------- LOAD ALERTS ---------- */
+  async function loadAlerts() {
+    alertList.innerHTML = "";
 
-    const symbol = alertSymbol.value;
-    const price = Number(alertPrice.value);
-    if (!symbol || !price) return alert("Fill both");
+    const snap = await getDocs(
+      collection(db, "users", getUserId(), "alerts")
+    );
 
-    await addDoc(collection(db, "users", uid, "alerts"), {
-      symbol,
-      price,
-      email: window.currentUser.email,
-      triggered: false,
-      createdAt: new Date()
+    if (snap.empty) {
+      alertList.innerHTML = `<p style="opacity:.5">No alerts set</p>`;
+      return;
+    }
+
+    snap.forEach(docSnap => {
+      const a = docSnap.data();
+
+      const div = document.createElement("div");
+      div.className = "alert-item";
+
+      div.innerHTML = `
+        <span>${a.symbol}</span>
+        <span>₹${a.price}</span>
+        <span>${a.triggered ? "✅ Triggered" : "⏳ Waiting"}</span>
+      `;
+
+      alertList.appendChild(div);
     });
+  }
+
+  /* ---------- ADD ALERT ---------- */
+  addAlertBtn.onclick = async () => {
+    const symbol = alertSymbol.value;
+    const price = parseFloat(alertPrice.value);
+
+    if (!symbol || !price) {
+      alert("Enter valid alert");
+      return;
+    }
+
+    await addDoc(
+      collection(db, "users", getUserId(), "alerts"),
+      {
+        symbol,
+        price,
+        triggered: false,
+        createdAt: new Date()
+      }
+    );
 
     alertPrice.value = "";
     loadAlerts();
   };
-
-  async function loadAlerts() {
-    const uid = getUserId();
-    if (!uid) return;
-
-    const snap = await getDocs(collection(db, "users", uid, "alerts"));
-    alertList.innerHTML = "";
-
-    snap.forEach(d => {
-      const a = d.data();
-      const row = document.createElement("div");
-      row.className = "alert-row";
-      row.innerHTML = `
-        <span class="alert-chip">${a.symbol}</span>
-        <span>₹${a.price}</span>
-        <span>${a.triggered ? "Triggered" : "Pending"}</span>
-        <button>✕</button>
-      `;
-
-      row.querySelector("button").onclick = async () => {
-        await deleteDoc(doc(db, "users", uid, "alerts", d.id));
-        loadAlerts();
-      };
-
-      alertList.appendChild(row);
-    });
-  }
 
   return {
     populateDropdown,
