@@ -2,9 +2,10 @@ const express = require("express");
 const https = require("https");
 const fs = require("fs");
 const path = require("path");
-const nodemailer = require("nodemailer");
 const admin = require("firebase-admin");
 const zlib = require("zlib");
+const { Resend } = require("resend");
+const resend = new Resend(process.env.RESEND_API_KEY);
 
 const app = express();
 app.use(express.json());
@@ -165,10 +166,33 @@ async function checkAllAlerts() {
         const d = prices[a.symbol];
         if (!d || !d.price) continue;
 
+        console.log(`🔍 ${a.symbol} | current=${d.price} target=${a.price}`);
+
         if (d.price >= a.price) {
 
           console.log("🔥 ALERT TRIGGERED:", a.symbol);
 
+          /* ✅ SEND EMAIL (RESEND) */
+          try {
+            const response = await resend.emails.send({
+              from: "Stock Watchlist <onboarding@resend.dev>",
+              to: [a.email],
+              subject: `🔔 Alert Triggered: ${a.symbol}`,
+              html: `
+                <h3>🚨 Price Alert Triggered</h3>
+                <p><b>Stock:</b> ${a.symbol}</p>
+                <p><b>Target Price:</b> ₹${a.price}</p>
+                <p><b>Current Price:</b> ₹${d.price.toFixed(2)}</p>
+              `
+            });
+
+            console.log("✅ Email sent:", response);
+
+          } catch (err) {
+            console.error("❌ Email failed:", err);
+          }
+
+          /* ✅ UPDATE FIRESTORE */
           await fdb
             .collection("users")
             .doc(a.uid)
@@ -182,7 +206,7 @@ async function checkAllAlerts() {
       }
     }
   } catch (e) {
-    console.error("Alert engine error:", e.message);
+    console.error("❌ Alert engine error:", e.message);
   }
 }
 
@@ -307,16 +331,7 @@ async function fetchIndexHistory(symbol) {
   };
 }
 
-app.get("/api/indices", async (_, res) => {
-  const result = [];
 
-  for (const [name, symbol] of Object.entries(INDICES)) {
-    const data = await fetchIndexHistory(symbol);
-    if (data) result.push({ name, ...data });
-  }
-
-  res.json(result);
-});
 
 /* =====================
    START SERVER
