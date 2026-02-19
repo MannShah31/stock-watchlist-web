@@ -170,39 +170,46 @@ async function checkAllAlerts() {
 
         if (d.price >= a.price) {
 
-          console.log("🔥 ALERT TRIGGERED:", a.symbol);
+  console.log(`🔥 ALERT TRIGGERED: ${a.symbol}`);
 
-          /* ✅ SEND EMAIL (RESEND) */
-          try {
-            const response = await resend.emails.send({
-              from: "onboarding@resend.dev", // ✅ FIXED
-              to: a.email,                  // ✅ FIXED (not array)
-              subject: `🔔 Alert Triggered: ${a.symbol}`,
-              html: `
-                <h3>🚨 Price Alert Triggered</h3>
-                <p><b>Stock:</b> ${a.symbol}</p>
-                <p><b>Target Price:</b> ₹${a.price}</p>
-                <p><b>Current Price:</b> ₹${d.price.toFixed(2)}</p>
-              `
-            });
+  try {
+    // ✅ Get user's email from Firebase Auth
+    const userDoc = await admin.auth().getUser(a.uid);
+    const email = userDoc.email;
 
-            console.log("✅ Email sent:", response);
+    if (!email) {
+      console.log("❌ No email found for user:", a.uid);
+      continue;
+    }
 
-          } catch (err) {
-            console.error("❌ Email failed:", err);
-          }
+    const response = await resend.emails.send({
+      from: "Stock Watchlist <onboarding@resend.dev>",
+      to: email, // ✅ always valid now
+      subject: `🔔 Alert: ${a.symbol}`,
+      html: `
+        <h2>📈 Stock Alert Triggered</h2>
+        <p><b>${a.symbol}</b></p>
+        <p>Target Price: ₹${a.price}</p>
+        <p>Current Price: ₹${d.price.toFixed(2)}</p>
+      `
+    });
 
-          /* ✅ UPDATE FIRESTORE */
-          await fdb
-            .collection("users")
-            .doc(a.uid)
-            .collection("alerts")
-            .doc(a.id)
-            .update({
-              triggered: true,
-              triggeredAt: admin.firestore.FieldValue.serverTimestamp()
-            });
-        }
+    console.log("✅ Email sent:", response);
+
+  } catch (err) {
+    console.error("❌ Email failed:", err);
+  }
+
+  await fdb
+    .collection("users")
+    .doc(a.uid)
+    .collection("alerts")
+    .doc(a.id)
+    .update({
+      triggered: true,
+      triggeredAt: admin.firestore.FieldValue.serverTimestamp()
+    });
+}
       }
     }
   } catch (e) {
