@@ -138,6 +138,22 @@ async function checkAllAlerts() {
 
     for (const u of users.docs) {
 
+      // ✅ get user email ONCE
+      let email = null;
+
+      try {
+        const userAuth = await admin.auth().getUser(u.id);
+        email = userAuth.email;
+      } catch (e) {
+        console.log("❌ Failed to fetch user email:", u.id);
+        continue;
+      }
+
+      if (!email || typeof email !== "string") {
+        console.log("❌ Invalid email:", email);
+        continue;
+      }
+
       const alertsSnap = await fdb
         .collection("users")
         .doc(u.id)
@@ -149,7 +165,6 @@ async function checkAllAlerts() {
 
       const alerts = alertsSnap.docs.map(d => ({
         id: d.id,
-        uid: u.id,
         ...d.data()
       }));
 
@@ -166,52 +181,47 @@ async function checkAllAlerts() {
         const d = prices[a.symbol];
         if (!d || !d.price) continue;
 
-        console.log(`🔍 ${a.symbol} | current=${d.price} target=${a.price}`);
+        const target = Number(a.price);
 
-        if (d.price >= a.price) {
+        console.log(`🔍 ${a.symbol} | current=${d.price} target=${target}`);
 
-  console.log(`🔥 ALERT TRIGGERED: ${a.symbol}`);
+        if (d.price >= target) {
 
-  try {
-    // ✅ Get user's email from Firebase Auth
-    const userDoc = await admin.auth().getUser(a.uid);
-    const email = userDoc.email;
+          console.log(`🔥 ALERT TRIGGERED: ${a.symbol}`);
 
-    if (!email) {
-      console.log("❌ No email found for user:", a.uid);
-      continue;
-    }
+          try {
+            await resend.emails.send({
+              from: "Stock Watchlist <onboarding@resend.dev>",
+              to: email, // ✅ guaranteed string
+              subject: `🔔 Alert: ${a.symbol}`,
+              html: `
+                <h2>📈 Stock Alert Triggered</h2>
+                <p><b>${a.symbol}</b></p>
+                <p>Target Price: ₹${target}</p>
+                <p>Current Price: ₹${d.price.toFixed(2)}</p>
+              `
+            });
 
-    const response = await resend.emails.send({
-      from: "Stock Watchlist <onboarding@resend.dev>",
-      to: email, // ✅ always valid now
-      subject: `🔔 Alert: ${a.symbol}`,
-      html: `
-        <h2>📈 Stock Alert Triggered</h2>
-        <p><b>${a.symbol}</b></p>
-        <p>Target Price: ₹${a.price}</p>
-        <p>Current Price: ₹${d.price.toFixed(2)}</p>
-      `
-    });
+            console.log("✅ Email sent to:", email);
 
-    console.log("✅ Email sent:", response);
+          } catch (err) {
+            console.error("❌ Email failed:", err);
+          }
 
-  } catch (err) {
-    console.error("❌ Email failed:", err);
-  }
-
-  await fdb
-    .collection("users")
-    .doc(a.uid)
-    .collection("alerts")
-    .doc(a.id)
-    .update({
-      triggered: true,
-      triggeredAt: admin.firestore.FieldValue.serverTimestamp()
-    });
-}
+          // ✅ mark triggered AFTER sending
+          await fdb
+            .collection("users")
+            .doc(u.id)
+            .collection("alerts")
+            .doc(a.id)
+            .update({
+              triggered: true,
+              triggeredAt: admin.firestore.FieldValue.serverTimestamp()
+            });
+        }
       }
     }
+
   } catch (e) {
     console.error("❌ Alert engine error:", e.message);
   }
