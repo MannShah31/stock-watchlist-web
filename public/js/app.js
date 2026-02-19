@@ -60,24 +60,43 @@ async function loadIndices() {
 
     indicesTableBody.innerHTML = "";
 
-    data.forEach(i => {
-      const tr = document.createElement("tr");
-      tr.innerHTML = `
-        <td>${i.name}</td>
-        <td>₹${i.twoYearAgo?.toFixed(2) || "-"}</td>
-        <td>₹${i.oneYearAgo?.toFixed(2) || "-"}</td>
-        <td>₹${i.current.toFixed(2)}</td>
-        <td>₹${i.high52.toFixed(2)}</td>
-        <td>₹${i.low52.toFixed(2)}</td>
-        <td class="${i.mom >= 0 ? "pos" : "neg"}">${i.mom.toFixed(2)}%</td>
-        <td class="${i.yoy >= 0 ? "pos" : "neg"}">${i.yoy.toFixed(2)}%</td>
+    function renderGroup(title, stocks) {
+      const headerRow = document.createElement("tr");
+      headerRow.innerHTML = `
+        <td colspan="10" style="font-weight:700;color:#60a5fa;padding-top:20px;">
+          ${title}
+        </td>
       `;
-      indicesTableBody.appendChild(tr);
-    });
+      indicesTableBody.appendChild(headerRow);
+
+      stocks.forEach(d => {
+        const tr = document.createElement("tr");
+        tr.innerHTML = `
+          <td>${d.symbol.replace(".NS","")}</td>
+          <td>₹${d.price.toFixed(2)}</td>
+          <td class="${d.dayChange >= 0 ? "pos" : "neg"}">
+            ₹${d.dayChange?.toFixed(2) ?? "-"}
+          </td>
+          <td>${d.weekChange?.toFixed(2) ?? "-"}%</td>
+          <td>${d.monthChange?.toFixed(2) ?? "-"}%</td>
+          <td>${d.threeMonthChange?.toFixed(2) ?? "-"}%</td>
+          <td>${d.marketCap ? (d.marketCap/1e7).toFixed(2)+" Cr" : "-"}</td>
+          <td>${d.pe ? d.pe.toFixed(1) : "-"}</td>
+          <td>${d.high52?.toFixed(2) ?? "-"}</td>
+          <td>${d.low52?.toFixed(2) ?? "-"}</td>
+        `;
+        indicesTableBody.appendChild(tr);
+      });
+    }
+
+    renderGroup("Nifty 50", data.nifty50 || []);
+    renderGroup("Sensex", data.sensex || []);
+
   } catch (e) {
-    console.error("❌ Failed to load indices", e);
+    console.error("Failed to load indices", e);
   }
 }
+
 
 function startIndicesAutoRefresh() {
   stopIndicesAutoRefresh();

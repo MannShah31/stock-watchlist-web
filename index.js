@@ -166,11 +166,60 @@ app.get("/api/stocks", (_, res) => {
    📊 INDICES API
 ===================== */
 
-const INDICES = {
-  "Nifty 50": "^NSEI",
-  "Nifty Bank": "^NSEBANK",
-  "Sensex": "^BSESN"
-};
+/* =====================
+   📊 INDICES STOCK LIST
+===================== */
+
+const NIFTY50 = [
+  "RELIANCE.NS","TCS.NS","HDFCBANK.NS","ICICIBANK.NS","INFY.NS",
+  "ITC.NS","SBIN.NS","LT.NS","AXISBANK.NS","KOTAKBANK.NS",
+  "BHARTIARTL.NS","ASIANPAINT.NS","MARUTI.NS","SUNPHARMA.NS",
+  "TITAN.NS","ULTRACEMCO.NS","WIPRO.NS","NESTLEIND.NS",
+  "BAJFINANCE.NS","HCLTECH.NS","POWERGRID.NS","NTPC.NS",
+  "ADANIENT.NS","ADANIPORTS.NS","ONGC.NS","TATAMOTORS.NS",
+  "HINDUNILVR.NS","JSWSTEEL.NS","TECHM.NS","COALINDIA.NS",
+  "GRASIM.NS","DRREDDY.NS","INDUSINDBK.NS","HINDALCO.NS",
+  "BPCL.NS","CIPLA.NS","APOLLOHOSP.NS","DIVISLAB.NS",
+  "EICHERMOT.NS","HEROMOTOCO.NS","BAJAJFINSV.NS","BRITANNIA.NS",
+  "UPL.NS","TATACONSUM.NS","M&M.NS","SBILIFE.NS",
+  "BAJAJ-AUTO.NS","HDFCLIFE.NS","SHREECEM.NS","LTIM.NS"
+];
+
+const SENSEX = [
+  "RELIANCE.NS","TCS.NS","HDFCBANK.NS","ICICIBANK.NS","INFY.NS",
+  "ITC.NS","SBIN.NS","LT.NS","AXISBANK.NS","KOTAKBANK.NS",
+  "BHARTIARTL.NS","ASIANPAINT.NS","MARUTI.NS","SUNPHARMA.NS",
+  "TITAN.NS","ULTRACEMCO.NS","WIPRO.NS","NESTLEIND.NS",
+  "BAJFINANCE.NS","HCLTECH.NS","POWERGRID.NS","NTPC.NS",
+  "ONGC.NS","TATAMOTORS.NS","HINDUNILVR.NS","JSWSTEEL.NS",
+  "TECHM.NS","GRASIM.NS","INDUSINDBK.NS","HINDALCO.NS"
+];
+
+/* =====================
+   📊 INDICES API (STOCK LEVEL)
+===================== */
+
+app.get("/api/indices", async (_, res) => {
+  try {
+
+    async function fetchGroup(symbols) {
+      const data = await Promise.all(symbols.map(fetchSingleStock));
+      return data.filter(Boolean);
+    }
+
+    const niftyData = await fetchGroup(NIFTY50);
+    const sensexData = await fetchGroup(SENSEX);
+
+    res.json({
+      nifty50: niftyData,
+      sensex: sensexData
+    });
+
+  } catch (e) {
+    console.error("Indices error:", e);
+    res.status(500).json({});
+  }
+});
 
 async function fetchIndexHistory(symbol) {
   const data = await yahooGET(
