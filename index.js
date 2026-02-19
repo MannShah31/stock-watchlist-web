@@ -175,8 +175,8 @@ async function checkAllAlerts() {
           /* ✅ SEND EMAIL (RESEND) */
           try {
             const response = await resend.emails.send({
-              from: "Stock Watchlist <onboarding@resend.dev>",
-              to: [a.email],
+              from: "onboarding@resend.dev", // ✅ FIXED
+              to: a.email,                  // ✅ FIXED (not array)
               subject: `🔔 Alert Triggered: ${a.symbol}`,
               html: `
                 <h3>🚨 Price Alert Triggered</h3>
