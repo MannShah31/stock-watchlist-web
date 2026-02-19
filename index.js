@@ -118,9 +118,6 @@ async function fetchSingleStock(symbol) {
         ? ((current - threeMonthAgo) / threeMonthAgo) * 100
         : null,
 
-      marketCap,
-      pe,
-
       high52: Math.max(...closes.slice(-252)),
       low52: Math.min(...closes.slice(-252))
     };
