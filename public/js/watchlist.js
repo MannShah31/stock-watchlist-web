@@ -63,7 +63,7 @@ async function render() {
   if (!list.length) {
     tableBody.innerHTML = `
       <tr>
-        <td colspan="11" style="opacity:.5">
+        <td colspan="9" style="opacity:.5">
           Add stocks to your watchlist
         </td>
       </tr>`;
@@ -108,13 +108,41 @@ async function render() {
         ${d.threeMonthChange?.toFixed(2) ?? "-"}%
       </td>
 
-      <td>
-        ${
-          d.marketCap
-            ? `₹${(d.marketCap / 1e7).toFixed(2)} Cr`
-            : "-"
-        }
-      </td>
+      <tr>
+  <td>
+    <a href="https://www.screener.in/company/${screenerSymbol}/"
+       target="_blank"
+       style="color:#60a5fa;text-decoration:none;font-weight:600">
+      ${s.name}
+    </a>
+  </td>
+
+  <td>₹${d.price.toFixed(2)}</td>
+
+  <td class="${d.dayChange >= 0 ? "pos" : "neg"}">
+    ₹${d.dayChange?.toFixed(2) ?? "-"}
+  </td>
+
+  <td class="${d.weekChange >= 0 ? "pos" : "neg"}">
+    ${d.weekChange?.toFixed(2) ?? "-"}%
+  </td>
+
+  <td class="${d.monthChange >= 0 ? "pos" : "neg"}">
+    ${d.monthChange?.toFixed(2) ?? "-"}%
+  </td>
+
+  <td class="${d.threeMonthChange >= 0 ? "pos" : "neg"}">
+    ${d.threeMonthChange?.toFixed(2) ?? "-"}%
+  </td>
+
+  <td>${d.high52?.toFixed(2) ?? "-"}</td>
+  <td>${d.low52?.toFixed(2) ?? "-"}</td>
+
+  <td>
+    <button class="remove-btn" data-sym="${s.symbol}">✕</button>
+  </td>
+</tr>
+
 
       <td>
         ${d.pe ? d.pe.toFixed(1) : "-"}
