@@ -304,8 +304,7 @@ app.get("/api/stocks", (_, res) => {
       if (symbol.includes("STEEL") || symbol.includes("METAL")) return "Metals";
       if (symbol.includes("POWER") || symbol.includes("GRID")) return "Energy";
       if (symbol.includes("OIL") || symbol.includes("GAS")) return "Energy";
-      if (symbol.includes("EXPORTS")) return "Exports";
-
+      if (symbol.includes("EXPORT")) return "Exports";
       return "Other";
     }
 
