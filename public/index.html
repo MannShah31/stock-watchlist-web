@@ -40,7 +40,18 @@
   <button id="logoutBtn">Logout</button>
 </header>
 
-<div class="app-wrap">
+<!-- 🔽 FILTER BAR (NEW) -->
+<div style="display:flex; gap:10px; margin:10px 0;">
+  <select id="industryFilter">
+    <option value="">All Industries</option>
+  </select>
+
+  <select id="categoryFilter">
+    <option value="">All Categories</option>
+  </select>
+</div>
+
+<div class="table-wrap">
 
   <!-- ========== WATCHLIST TAB ========== -->
   <div id="watchTab">

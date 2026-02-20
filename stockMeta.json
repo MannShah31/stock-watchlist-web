@@ -1,0 +1,22 @@
+{
+  "RELIANCE.NS": {
+    "industry": "Energy",
+    "category": "Large Cap"
+  },
+  "TCS.NS": {
+    "industry": "IT",
+    "category": "Large Cap"
+  },
+  "HDFCBANK.NS": {
+    "industry": "Banking",
+    "category": "Large Cap"
+  },
+  "INFY.NS": {
+    "industry": "IT",
+    "category": "Large Cap"
+  },
+  "SBIN.NS": {
+    "industry": "Banking",
+    "category": "Large Cap"
+  }
+}

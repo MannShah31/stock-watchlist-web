@@ -58,18 +58,29 @@ export function setupWatchlist({
 
   /* ---------- RENDER ---------- */
   async function render() {
-    const list = getWatchlist();
+  let list = getWatchlist();
+
+  const industry = document.getElementById("industryFilter")?.value;
+  const category = document.getElementById("categoryFilter")?.value;
+
+  // ✅ APPLY FILTER
+  if (industry || category) {
+    list = list.filter(s =>
+      (!industry || s.industry === industry) &&
+      (!category || s.category === category)
+    );
+  }
     tableBody.innerHTML = "";
 
     if (!list.length) {
-      tableBody.innerHTML = `
-        <tr>
-          <td colspan="9" style="opacity:.5">
-            Add stocks to your watchlist
-          </td>
-        </tr>`;
-      return;
-    }
+  tableBody.innerHTML = `
+    <tr>
+      <td colspan="9" style="opacity:.5">
+        No stocks match selected filters
+      </td>
+    </tr>`;
+  return;
+}
 
     const priceData = await getPrices(list.map(s => s.symbol));
 

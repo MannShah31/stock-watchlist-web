@@ -279,10 +279,27 @@ app.get("/api/prices", async (req, res) => {
 ===================== */
 app.get("/api/stocks", (_, res) => {
   try {
-    const data = JSON.parse(
+    const stocks = JSON.parse(
       fs.readFileSync(path.join(__dirname, "stocks.json"), "utf8")
     );
-    res.json(data);
+
+    let meta = {};
+    try {
+      meta = JSON.parse(
+        fs.readFileSync(path.join(__dirname, "stockMeta.json"), "utf8")
+      );
+    } catch {
+      console.log("⚠️ stockMeta.json not found");
+    }
+
+    const enriched = stocks.map(s => ({
+      ...s,
+      industry: meta[s.symbol]?.industry || "Other",
+      category: meta[s.symbol]?.category || "Unknown"
+    }));
+
+    res.json(enriched);
+
   } catch (e) {
     console.error("Failed to read stocks.json", e);
     res.status(500).json([]);

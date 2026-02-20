@@ -136,6 +136,7 @@ setupAuth({
     indicesTab.style.display = "none";
 
     window.allStocks = await getAllStocks();
+    populateFilters(window.allStocks);
 
     console.log("Loaded stocks count:", window.allStocks?.length);
 
@@ -163,7 +164,14 @@ setupAuth({
     wl.render();
     alerts.populateDropdown();
     alerts.loadAlerts();
+    // 🔽 FILTER LISTENERS
+document.getElementById("industryFilter")
+  ?.addEventListener("change", () => wl.render());
+
+document.getElementById("categoryFilter")
+  ?.addEventListener("change", () => wl.render());
   },
+  
 
   onLogout: () => {
     stopIndicesAutoRefresh();
@@ -227,3 +235,29 @@ tabIndices.onclick = () => {
 
   startIndicesAutoRefresh();
 };
+function populateFilters(stocks) {
+  const industries = [...new Set(stocks.map(s => s.industry))].filter(Boolean);
+  const categories = [...new Set(stocks.map(s => s.category))].filter(Boolean);
+
+  const iSelect = document.getElementById("industryFilter");
+  const cSelect = document.getElementById("categoryFilter");
+
+  if (!iSelect || !cSelect) return;
+
+  iSelect.innerHTML = '<option value="">All Industries</option>';
+  cSelect.innerHTML = '<option value="">All Categories</option>';
+
+  industries.forEach(i => {
+    const opt = document.createElement("option");
+    opt.value = i;
+    opt.textContent = i;
+    iSelect.appendChild(opt);
+  });
+
+  categories.forEach(c => {
+    const opt = document.createElement("option");
+    opt.value = c;
+    opt.textContent = c;
+    cSelect.appendChild(opt);
+  });
+}
