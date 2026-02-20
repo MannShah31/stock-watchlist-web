@@ -41,11 +41,6 @@ export function setupWatchlist({
   async function addStock(s) {
     let list = getWatchlist();
 
-// 🔥 ENRICH WATCHLIST FROM allStocks
-list = list.map(s => {
-  const full = window.allStocks.find(x => x.symbol === s.symbol);
-  return full || s;
-});
     if (list.find(x => x.symbol === s.symbol)) return;
 
     list.push(s);
@@ -64,29 +59,42 @@ list = list.map(s => {
 
   /* ---------- RENDER ---------- */
   async function render() {
-  let list = getWatchlist();
+    let list = getWatchlist();
 
-  const industry = document.getElementById("industryFilter")?.value;
-  const category = document.getElementById("categoryFilter")?.value;
-
-  // ✅ APPLY FILTER
-  if (industry || category) {
-    list = list.filter(s =>
-      (!industry || s.industry === industry) &&
-      (!category || s.category === category)
+    // ✅ FIX 1: ENRICH WATCHLIST HERE (CRITICAL)
+    const stockMap = Object.fromEntries(
+      window.allStocks.map(s => [s.symbol.trim().toUpperCase(), s])
     );
-  }
+
+    list = list.map(s => {
+      const key = s.symbol?.trim().toUpperCase();
+      return stockMap[key] || s;
+    });
+
+    console.log("✅ Enriched list:", list);
+
+    // ✅ FILTERS
+    const industry = document.getElementById("industryFilter")?.value;
+    const category = document.getElementById("categoryFilter")?.value;
+
+    if (industry || category) {
+      list = list.filter(s =>
+        (!industry || s.industry === industry) &&
+        (!category || s.category === category)
+      );
+    }
+
     tableBody.innerHTML = "";
 
     if (!list.length) {
-  tableBody.innerHTML = `
-    <tr>
-      <td colspan="9" style="opacity:.5">
-        No stocks match selected filters
-      </td>
-    </tr>`;
-  return;
-}
+      tableBody.innerHTML = `
+        <tr>
+          <td colspan="9" style="opacity:.5">
+            No stocks match selected filters
+          </td>
+        </tr>`;
+      return;
+    }
 
     const priceData = await getPrices(list.map(s => s.symbol));
 
