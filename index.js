@@ -132,13 +132,17 @@ async function fetchSingleStock(symbol) {
 /* =====================
    ALERT ENGINE
 ===================== */
+/* =====================
+   ALERT ENGINE
+===================== */
 async function checkAllAlerts() {
   try {
+    console.log("⏱ Running alert check...");
+
     const users = await fdb.collection("users").get();
 
     for (const u of users.docs) {
 
-      // ✅ get user email ONCE
       let email = null;
 
       try {
@@ -185,14 +189,19 @@ async function checkAllAlerts() {
 
         console.log(`🔍 ${a.symbol} | current=${d.price} target=${target}`);
 
-        if (d.price >= target) {
+        if (d.price >= target && !a.triggered) {
 
           console.log(`🔥 ALERT TRIGGERED: ${a.symbol}`);
 
+          let sent = false;
+
           try {
-            await resend.emails.send({
+            console.log("📤 FROM:", "alerts@daggergarments.in");
+            console.log("📤 TO:", email);
+
+            const response = await resend.emails.send({
               from: "Stock Watchlist <alerts@daggergarments.in>",
-              to: email, // ✅ guaranteed string
+              to: email,
               subject: `🔔 Alert: ${a.symbol}`,
               html: `
                 <h2>📈 Stock Alert Triggered</h2>
@@ -202,22 +211,27 @@ async function checkAllAlerts() {
               `
             });
 
+            console.log("📨 Resend response:", response);
             console.log("✅ Email sent to:", email);
 
+            sent = true;
+
           } catch (err) {
-            console.error("❌ Email failed:", err);
+            console.error("❌ Email failed FULL:", JSON.stringify(err, null, 2));
           }
 
-          // ✅ mark triggered AFTER sending
-          await fdb
-            .collection("users")
-            .doc(u.id)
-            .collection("alerts")
-            .doc(a.id)
-            .update({
-              triggered: true,
-              triggeredAt: admin.firestore.FieldValue.serverTimestamp()
-            });
+          // ✅ only mark triggered if email actually sent
+          if (sent) {
+            await fdb
+              .collection("users")
+              .doc(u.id)
+              .collection("alerts")
+              .doc(a.id)
+              .update({
+                triggered: true,
+                triggeredAt: admin.firestore.FieldValue.serverTimestamp()
+              });
+          }
         }
       }
     }
@@ -227,6 +241,21 @@ async function checkAllAlerts() {
   }
 }
 
+/* =====================
+   🔔 CRON ENDPOINT (IMPORTANT)
+===================== */
+app.get("/run-alerts", async (req, res) => {
+  try {
+    await checkAllAlerts();
+    res.send("✅ Alerts checked");
+  } catch (e) {
+    console.error("❌ Manual alert run failed:", e);
+    res.status(500).send("Error running alerts");
+  }
+});
+
+/* RUN EVERY 1 MIN (backup) */
+setInterval(checkAllAlerts, 60 * 1000);
 /* RUN EVERY 1 MIN */
 setInterval(checkAllAlerts, 60 * 1000);
 /* =====================
