@@ -297,13 +297,14 @@ app.get("/api/stocks", (_, res) => {
       symbol = symbol.toUpperCase();
 
       if (symbol.includes("BANK")) return "Banking";
-      if (symbol.includes("PHARMA")) return "Pharma";
+      if (symbol.includes("PHARMACEUTICAL")) return "Pharma";
       if (symbol.includes("INFY") || symbol.includes("TCS") || symbol.includes("WIPRO")) return "IT";
       if (symbol.includes("AUTO") || symbol.includes("MOTORS")) return "Auto";
       if (symbol.includes("CEMENT")) return "Cement";
       if (symbol.includes("STEEL") || symbol.includes("METAL")) return "Metals";
       if (symbol.includes("POWER") || symbol.includes("GRID")) return "Energy";
       if (symbol.includes("OIL") || symbol.includes("GAS")) return "Energy";
+      if (symbol.includes("EXPORTS")) return "Exports";
 
       return "Other";
     }
