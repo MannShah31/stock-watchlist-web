@@ -191,7 +191,7 @@ async function checkAllAlerts() {
 
           try {
             await resend.emails.send({
-              from: "Stock Watchlist <alerts@stockwatchlist.com>",
+              from: "Stock Watchlist <alerts@daggergarments.in>",
               to: email, // ✅ guaranteed string
               subject: `🔔 Alert: ${a.symbol}`,
               html: `
