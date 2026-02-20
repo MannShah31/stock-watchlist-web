@@ -305,6 +305,17 @@ app.get("/api/stocks", (_, res) => {
     res.status(500).json([]);
   }
 });
+function getIndustry(symbol) {
+  symbol = symbol.toUpperCase();
+
+  if (symbol.includes("BANK")) return "Banking";
+  if (symbol.includes("PHARMA")) return "Pharma";
+  if (symbol.includes("INFY") || symbol.includes("TCS") || symbol.includes("WIPRO")) return "IT";
+  if (symbol.includes("AUTO") || symbol.includes("MOTORS")) return "Auto";
+  if (symbol.includes("CEMENT")) return "Cement";
+
+  return "Other";
+}
 /* =====================
    📊 INDICES API
 ===================== */
