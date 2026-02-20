@@ -330,10 +330,12 @@ function getIndustry(symbol) {
   symbol = symbol.toUpperCase();
 
   if (symbol.includes("BANK")) return "Banking";
-  if (symbol.includes("PHARMA")) return "Pharma";
+  if (symbol.includes("PHARMACEUTICAL")) return "Pharma";
   if (symbol.includes("INFY") || symbol.includes("TCS") || symbol.includes("WIPRO")) return "IT";
   if (symbol.includes("AUTO") || symbol.includes("MOTORS")) return "Auto";
   if (symbol.includes("CEMENT")) return "Cement";
+  if (symbol.includes("POWER")) return "Power";
+  if (symbol.includes("EXPORTS")) return "Exports";
 
   return "Other";
 }
