@@ -40,6 +40,12 @@ export function setupWatchlist({
   /* ---------- ADD STOCK ---------- */
   async function addStock(s) {
     let list = getWatchlist();
+
+// 🔥 ENRICH WATCHLIST FROM allStocks
+list = list.map(s => {
+  const full = window.allStocks.find(x => x.symbol === s.symbol);
+  return full || s;
+});
     if (list.find(x => x.symbol === s.symbol)) return;
 
     list.push(s);
