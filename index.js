@@ -292,10 +292,31 @@ app.get("/api/stocks", (_, res) => {
       console.log("⚠️ stockMeta.json not found");
     }
 
+    // 🔥 AUTO INDUSTRY DETECTION (fallback)
+    function getIndustry(symbol) {
+      symbol = symbol.toUpperCase();
+
+      if (symbol.includes("BANK")) return "Banking";
+      if (symbol.includes("PHARMA")) return "Pharma";
+      if (symbol.includes("INFY") || symbol.includes("TCS") || symbol.includes("WIPRO")) return "IT";
+      if (symbol.includes("AUTO") || symbol.includes("MOTORS")) return "Auto";
+      if (symbol.includes("CEMENT")) return "Cement";
+      if (symbol.includes("STEEL") || symbol.includes("METAL")) return "Metals";
+      if (symbol.includes("POWER") || symbol.includes("GRID")) return "Energy";
+      if (symbol.includes("OIL") || symbol.includes("GAS")) return "Energy";
+
+      return "Other";
+    }
+
     const enriched = stocks.map(s => ({
       ...s,
-      industry: meta[s.symbol]?.industry || "Other",
-      category: meta[s.symbol]?.category || "Unknown"
+      industry:
+        meta[s.symbol]?.industry ||
+        getIndustry(s.symbol),
+
+      category:
+        meta[s.symbol]?.category ||
+        "Unknown"
     }));
 
     res.json(enriched);
