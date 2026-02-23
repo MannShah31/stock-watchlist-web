@@ -31,20 +31,26 @@ export function setupAlerts({
     }
   }
 
-  function showDesktopNotification(symbol, target) {
-    if (!("Notification" in window)) return;
-    if (Notification.permission !== "granted") return;
+function showDesktopNotification(symbol, target) {
 
-    const notification = new Notification("🔔 Stock Alert Triggered!", {
-      body: `${symbol} crossed ₹${target}`,
-      icon: "/favicon.ico"
-    });
+  console.log("Notification permission:", Notification.permission);
 
-    notification.onclick = () => {
-      window.focus();
-      notification.close();
-    };
+  if (!("Notification" in window)) {
+    console.log("Notifications not supported");
+    return;
   }
+
+  if (Notification.permission !== "granted") {
+    console.log("Permission not granted");
+    return;
+  }
+
+  const notification = new Notification("🔔 Stock Alert Triggered!", {
+    body: `${symbol} crossed ₹${target}`
+  });
+
+  console.log("Notification triggered");
+}
 
   /* ---------- POPULATE DROPDOWN ---------- */
   function populateDropdown() {
