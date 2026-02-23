@@ -15,6 +15,9 @@ export function setupWatchlist({
 
   const tableBody = document.getElementById("stockTableBody");
 
+  // 🔥 Store previous prices for flash comparison
+  const previousPrices = {};
+
   /* ---------- SEARCH ---------- */
   search.addEventListener("input", e => {
     const q = e.target.value.toLowerCase().trim();
@@ -61,7 +64,6 @@ export function setupWatchlist({
 
     const rawList = getWatchlist();
 
-    // 🔥 Build fast lookup map (enriched stock data)
     const stockMap = Object.fromEntries(
       window.allStocks.map(s => [
         s.symbol.trim().toUpperCase(),
@@ -69,13 +71,11 @@ export function setupWatchlist({
       ])
     );
 
-    // 🔥 Always use enriched objects
     let list = rawList.map(s => {
       const key = s.symbol?.trim().toUpperCase();
       return stockMap[key] || s;
     });
 
-    // 🔥 Industry / Category Filters
     const industry = document.getElementById("industryFilter")?.value;
     const category = document.getElementById("categoryFilter")?.value;
 
@@ -98,10 +98,8 @@ export function setupWatchlist({
       return;
     }
 
-    // 🔥 Fetch prices
     const priceData = await getPrices(list.map(s => s.symbol));
 
-    // 🔥 Quick Filter (All / Gainers / Losers)
     const activeQuickFilter = window.quickFilter || "all";
 
     if (activeQuickFilter !== "all") {
@@ -131,7 +129,6 @@ export function setupWatchlist({
       return;
     }
 
-    // 🔥 Render table
     for (const s of list) {
 
       const d = priceData[s.symbol];
@@ -140,6 +137,9 @@ export function setupWatchlist({
       const screenerSymbol = s.symbol
         .replace(".NS", "")
         .replace(".BO", "");
+
+      const oldPrice = previousPrices[s.symbol];
+      const newPrice = d.price;
 
       const tr = document.createElement("tr");
 
@@ -152,7 +152,9 @@ export function setupWatchlist({
           </a>
         </td>
 
-        <td>₹${d.price?.toFixed(2) ?? "-"}</td>
+        <td class="price-cell">
+          ₹${newPrice?.toFixed(2) ?? "-"}
+        </td>
 
         <td class="${d.dayChange >= 0 ? "pos" : "neg"}">
           ₹${d.dayChange?.toFixed(2) ?? "-"}
@@ -178,6 +180,21 @@ export function setupWatchlist({
         </td>
       `;
 
+      tableBody.appendChild(tr);
+
+      // 🔥 Apply flash animation
+      if (oldPrice !== undefined && newPrice !== oldPrice) {
+        const priceCell = tr.querySelector(".price-cell");
+
+        if (newPrice > oldPrice) {
+          priceCell.classList.add("flash-up");
+        } else if (newPrice < oldPrice) {
+          priceCell.classList.add("flash-down");
+        }
+      }
+
+      previousPrices[s.symbol] = newPrice;
+
       tr.querySelector(".remove-btn").onclick = async () => {
         let updated = getWatchlist().filter(x => x.symbol !== s.symbol);
 
@@ -190,8 +207,6 @@ export function setupWatchlist({
         setWatchlist(updated);
         render();
       };
-
-      tableBody.appendChild(tr);
     }
   }
 
