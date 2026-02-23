@@ -24,21 +24,16 @@ const loginBtn = document.getElementById("loginBtn");
 const signupBtn = document.getElementById("signupBtn");
 const logoutBtn = document.getElementById("logoutBtn");
 
-// watchlist UI
-const stockGrid = document.getElementById("stockGrid");
 const dropdown = document.getElementById("dropdown");
 const search = document.getElementById("search");
 
-// alerts UI
 const alertSymbol = document.getElementById("alertSymbol");
 const alertPrice = document.getElementById("alertPrice");
 const addAlertBtn = document.getElementById("addAlertBtn");
 const alertList = document.getElementById("alertList");
 
-// indices UI
 const indicesTableBody = document.getElementById("indicesTableBody");
 
-// tabs
 const tabWatch = document.getElementById("tabWatch");
 const tabAlerts = document.getElementById("tabAlerts");
 const tabIndices = document.getElementById("tabIndices");
@@ -50,6 +45,35 @@ const indicesTab = document.getElementById("indicesTab");
 /* ================== HELPERS ================== */
 function resetScroll() {
   window.scrollTo({ top: 0, left: 0, behavior: "instant" });
+}
+
+/* ================== FILTER BUILDER ================== */
+function populateFiltersFromWatchlist(watchlist) {
+
+  const industries = [...new Set(watchlist.map(s => s.industry))].filter(Boolean);
+  const categories = [...new Set(watchlist.map(s => s.category))].filter(Boolean);
+
+  const iSelect = document.getElementById("industryFilter");
+  const cSelect = document.getElementById("categoryFilter");
+
+  if (!iSelect || !cSelect) return;
+
+  iSelect.innerHTML = '<option value="">All Industries</option>';
+  cSelect.innerHTML = '<option value="">All Categories</option>';
+
+  industries.forEach(i => {
+    const opt = document.createElement("option");
+    opt.value = i;
+    opt.textContent = i;
+    iSelect.appendChild(opt);
+  });
+
+  categories.forEach(c => {
+    const opt = document.createElement("option");
+    opt.value = c;
+    opt.textContent = c;
+    cSelect.appendChild(opt);
+  });
 }
 
 /* ================== INDICES ================== */
@@ -95,11 +119,10 @@ async function loadIndices() {
   }
 }
 
-
 function startIndicesAutoRefresh() {
   stopIndicesAutoRefresh();
   loadIndices();
-  indicesInterval = setInterval(loadIndices, 5 * 60 * 1000); // 5 mins
+  indicesInterval = setInterval(loadIndices, 5 * 60 * 1000);
 }
 
 function stopIndicesAutoRefresh() {
@@ -126,7 +149,6 @@ setupAuth({
 
     resetScroll();
 
-    // default → Watchlist
     tabWatch.classList.add("active");
     tabAlerts.classList.remove("active");
     tabIndices.classList.remove("active");
@@ -135,16 +157,13 @@ setupAuth({
     alertsTab.style.display = "none";
     indicesTab.style.display = "none";
 
+    // 🔥 Load full enriched stock dataset
     window.allStocks = await getAllStocks();
-    populateFilters(window.allStocks);
-
-    console.log("Loaded stocks count:", window.allStocks?.length);
 
     const snap = await getDoc(doc(db, "users", userId));
     watchlist = snap.exists() ? snap.data().watchlist || [] : [];
 
     const wl = setupWatchlist({
-      stockGrid,
       dropdown,
       search,
       getUserId: () => userId,
@@ -161,17 +180,32 @@ setupAuth({
       getWatchlist: () => watchlist
     });
 
+    // 🔥 Build filters from enriched watchlist
+    populateFiltersFromWatchlist(
+      watchlist.map(s => {
+        const full = window.allStocks.find(x => x.symbol === s.symbol);
+        return full || s;
+      })
+    );
+
     wl.render();
     alerts.populateDropdown();
     alerts.loadAlerts();
-    // 🔽 FILTER LISTENERS
-document.getElementById("industryFilter")
-  ?.addEventListener("change", () => wl.render());
 
-document.getElementById("categoryFilter")
-  ?.addEventListener("change", () => wl.render());
+    // 🔥 Filter listeners
+    document.getElementById("industryFilter")
+      ?.addEventListener("change", () => wl.render());
+
+    document.getElementById("categoryFilter")
+      ?.addEventListener("change", () => wl.render());
+
+    document.getElementById("clearFilters")
+      ?.addEventListener("click", () => {
+        document.getElementById("industryFilter").value = "";
+        document.getElementById("categoryFilter").value = "";
+        wl.render();
+      });
   },
-  
 
   onLogout: () => {
     stopIndicesAutoRefresh();
@@ -235,29 +269,3 @@ tabIndices.onclick = () => {
 
   startIndicesAutoRefresh();
 };
-function populateFilters(stocks) {
-  const industries = [...new Set(stocks.map(s => s.industry))].filter(Boolean);
-  const categories = [...new Set(stocks.map(s => s.category))].filter(Boolean);
-
-  const iSelect = document.getElementById("industryFilter");
-  const cSelect = document.getElementById("categoryFilter");
-
-  if (!iSelect || !cSelect) return;
-
-  iSelect.innerHTML = '<option value="">All Industries</option>';
-  cSelect.innerHTML = '<option value="">All Categories</option>';
-
-  industries.forEach(i => {
-    const opt = document.createElement("option");
-    opt.value = i;
-    opt.textContent = i;
-    iSelect.appendChild(opt);
-  });
-
-  categories.forEach(c => {
-    const opt = document.createElement("option");
-    opt.value = c;
-    opt.textContent = c;
-    cSelect.appendChild(opt);
-  });
-}
