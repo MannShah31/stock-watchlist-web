@@ -44,12 +44,14 @@
 
   <!-- 🔽 FILTER BAR -->
   <div class="filter-bar">
+
     <div class="filter-group">
       <label>Industry</label>
       <select id="industryFilter">
-      <option value="">All Industries</option>
+        <option value="">All Industries</option>
       </select>
     </div>
+
     <div class="filter-group">
       <label>Category</label>
       <select id="categoryFilter">
@@ -58,10 +60,19 @@
     </div>
 
     <button id="clearFilters" class="clear-btn">Clear</button>
+
+    <!-- 🔥 QUICK FILTER BUTTONS (NEW) -->
+    <div class="quick-filters">
+      <button id="filterAll" class="qf-btn active">All</button>
+      <button id="filterGainers" class="qf-btn">Gainers</button>
+      <button id="filterLosers" class="qf-btn">Losers</button>
+    </div>
+
   </div>
 
   <!-- ========== WATCHLIST TAB ========== -->
   <div id="watchTab">
+
     <div class="search-card">
       <input id="search" class="search-input" placeholder="Search stock...">
       <div id="dropdown" class="dropdown"></div>
@@ -85,9 +96,10 @@
         <tbody id="stockTableBody"></tbody>
       </table>
     </div>
+
   </div>
 
-  <!-- ALERTS TAB -->
+  <!-- ========== ALERTS TAB ========== -->
   <div id="alertsTab" style="display:none">
     <div class="alert-card">
       <h3>🔔 Price Alerts</h3>
@@ -102,7 +114,7 @@
     </div>
   </div>
 
-  <!-- INDICES TAB -->
+  <!-- ========== INDICES TAB ========== -->
   <div id="indicesTab" style="display:none">
     <div class="alert-card">
       <h3>📊 Market Indices</h3>
