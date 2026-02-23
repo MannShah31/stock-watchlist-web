@@ -40,15 +40,24 @@
   <button id="logoutBtn">Logout</button>
 </header>
 
-<!-- 🔽 FILTER BAR (NEW) -->
-<div style="display:flex; gap:10px; margin:10px 0;">
-<select id="industryFilter" multiple size="4"></select>
-<select id="categoryFilter"></select>
-<button id="clearFilters">Clear</button>    <option value="">All Industries</option>
-  </select>
-</div>
+<div class="app-wrap">
 
-<div class="table-wrap">
+  <!-- 🔽 FILTER BAR -->
+  <div class="filter-bar">
+    <div class="filter-group">
+      <label>Industry</label>
+      <select id="industryFilter" multiple></select>
+    </div>
+
+    <div class="filter-group">
+      <label>Category</label>
+      <select id="categoryFilter">
+        <option value="">All Categories</option>
+      </select>
+    </div>
+
+    <button id="clearFilters" class="clear-btn">Clear</button>
+  </div>
 
   <!-- ========== WATCHLIST TAB ========== -->
   <div id="watchTab">
@@ -72,36 +81,27 @@
             <th></th>
           </tr>
         </thead>
-
         <tbody id="stockTableBody"></tbody>
       </table>
     </div>
   </div>
 
-  <!-- ========== ALERTS TAB ========== -->
+  <!-- ALERTS TAB -->
   <div id="alertsTab" style="display:none">
     <div class="alert-card">
       <h3>🔔 Price Alerts</h3>
 
-      <!-- 🔥 FIXED: Proper layout + IDs -->
       <div class="alert-form">
         <select id="alertSymbol"></select>
-
-        <input 
-          id="alertPrice" 
-          type="number" 
-          placeholder="Target Price"
-        >
-
+        <input id="alertPrice" type="number" placeholder="Target Price">
         <button id="addAlertBtn">Add Alert</button>
       </div>
 
-      <!-- 🔥 FIXED: Proper container -->
       <div id="alertList" class="alert-list"></div>
     </div>
   </div>
 
-  <!-- ========== INDICES TAB ========== -->
+  <!-- INDICES TAB -->
   <div id="indicesTab" style="display:none">
     <div class="alert-card">
       <h3>📊 Market Indices</h3>
@@ -120,7 +120,6 @@
               <th>52W Low</th>
             </tr>
           </thead>
-
           <tbody id="indicesTableBody"></tbody>
         </table>
       </div>
@@ -133,9 +132,6 @@
 
 </div>
 </div>
-
-<!-- ================= REMOVE EMAILJS (NOT USED NOW) ================= -->
-<!-- ❌ Removed — was unnecessary and confusing -->
 
 <script type="module" src="/js/app.js"></script>
 </body>
