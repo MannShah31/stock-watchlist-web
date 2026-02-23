@@ -6,7 +6,6 @@ import { db } from "./firebase.js";
 import { getPrices } from "./api.js";
 
 export function setupWatchlist({
-  stockGrid,
   dropdown,
   search,
   getUserId,
@@ -62,7 +61,7 @@ export function setupWatchlist({
 
     const rawList = getWatchlist();
 
-    // 🔥 Build fast lookup map for enriched data
+    // 🔥 Build fast lookup map (enriched stock data)
     const stockMap = Object.fromEntries(
       window.allStocks.map(s => [
         s.symbol.trim().toUpperCase(),
@@ -70,13 +69,13 @@ export function setupWatchlist({
       ])
     );
 
-    // 🔥 Always use enriched stock objects
+    // 🔥 Always use enriched objects
     let list = rawList.map(s => {
       const key = s.symbol?.trim().toUpperCase();
       return stockMap[key] || s;
     });
 
-    // 🔥 Apply filters (single dropdown version)
+    // 🔥 Industry / Category Filters
     const industry = document.getElementById("industryFilter")?.value;
     const category = document.getElementById("categoryFilter")?.value;
 
@@ -99,8 +98,40 @@ export function setupWatchlist({
       return;
     }
 
+    // 🔥 Fetch prices
     const priceData = await getPrices(list.map(s => s.symbol));
 
+    // 🔥 Quick Filter (All / Gainers / Losers)
+    const activeQuickFilter = window.quickFilter || "all";
+
+    if (activeQuickFilter !== "all") {
+      list = list.filter(s => {
+        const d = priceData[s.symbol];
+        if (!d) return false;
+
+        if (activeQuickFilter === "gainers") {
+          return d.dayChange > 0;
+        }
+
+        if (activeQuickFilter === "losers") {
+          return d.dayChange < 0;
+        }
+
+        return true;
+      });
+    }
+
+    if (!list.length) {
+      tableBody.innerHTML = `
+        <tr>
+          <td colspan="9" style="opacity:.5">
+            No stocks match selected filters
+          </td>
+        </tr>`;
+      return;
+    }
+
+    // 🔥 Render table
     for (const s of list) {
 
       const d = priceData[s.symbol];
