@@ -31,27 +31,51 @@ export function setupAlerts({
     }
   }
 
-function showDesktopNotification(symbol, target) {
+function startRealtimeListener() {
 
-  console.log("Notification permission:", Notification.permission);
+  const alertsRef = collection(db, "users", getUserId(), "alerts");
 
-  if (!("Notification" in window)) {
-    console.log("Notifications not supported");
-    return;
-  }
+  onSnapshot(alertsRef, snapshot => {
 
-  if (Notification.permission !== "granted") {
-    console.log("Permission not granted");
-    return;
-  }
+    alertList.innerHTML = "";
 
-  const notification = new Notification("🔔 Stock Alert Triggered!", {
-    body: `${symbol} crossed ₹${target}`
+    if (snapshot.empty) {
+      alertList.innerHTML = `<p style="opacity:.5">No alerts set</p>`;
+      return;
+    }
+
+    snapshot.forEach(docSnap => {
+
+      const a = docSnap.data();
+      const alertId = docSnap.id;
+
+      const div = document.createElement("div");
+      div.className = "alert-item";
+
+      div.innerHTML = `
+        <span>${a.symbol}</span>
+        <span>₹${a.price}</span>
+        <span>${a.triggered ? "✅ Triggered" : "⏳ Waiting"}</span>
+      `;
+
+      alertList.appendChild(div);
+    });
+
+    // 🔥 THIS IS THE IMPORTANT PART
+    snapshot.docChanges().forEach(change => {
+
+      if (
+        change.type === "modified" &&
+        change.doc.data().triggered === true
+      ) {
+        const a = change.doc.data();
+
+        showDesktopNotification(a.symbol, a.price);
+      }
+    });
+
   });
-
-  console.log("Notification triggered");
 }
-
   /* ---------- POPULATE DROPDOWN ---------- */
   function populateDropdown() {
     alertSymbol.innerHTML = "";
