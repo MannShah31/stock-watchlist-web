@@ -208,3 +208,22 @@ button{
   color: white;
   border-color: #2563eb;
 }
+/* ================= PRICE FLASH ================= */
+
+.flash-up {
+  animation: flashGreen 0.8s ease;
+}
+
+.flash-down {
+  animation: flashRed 0.8s ease;
+}
+
+@keyframes flashGreen {
+  0%   { background-color: rgba(34,197,94,0.4); }
+  100% { background-color: transparent; }
+}
+
+@keyframes flashRed {
+  0%   { background-color: rgba(239,68,68,0.4); }
+  100% { background-color: transparent; }
+}
