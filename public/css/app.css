@@ -151,3 +151,33 @@ button{
   background:#020617;
   color:white;
 }
+.filter-bar {
+  display: flex;
+  gap: 20px;
+  align-items: flex-end;
+  margin: 15px 0;
+}
+
+.filter-group {
+  display: flex;
+  flex-direction: column;
+  font-size: 13px;
+}
+
+.filter-group select {
+  background: #0f172a;
+  color: white;
+  border: 1px solid #1f2a44;
+  padding: 6px;
+  border-radius: 6px;
+  min-width: 180px;
+}
+
+.clear-btn {
+  background: #2563eb;
+  color: white;
+  border: none;
+  padding: 7px 14px;
+  border-radius: 6px;
+  cursor: pointer;
+}
