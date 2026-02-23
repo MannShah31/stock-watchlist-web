@@ -181,3 +181,30 @@ button{
   border-radius: 6px;
   cursor: pointer;
 }
+.quick-filters {
+  display: flex;
+  gap: 8px;
+  margin-left: 20px;
+  align-items: center;
+}
+
+.qf-btn {
+  background: #0f172a;
+  border: 1px solid #1f2a44;
+  color: #cbd5e1;
+  padding: 6px 12px;
+  border-radius: 6px;
+  cursor: pointer;
+  font-size: 13px;
+  transition: 0.2s ease;
+}
+
+.qf-btn:hover {
+  border-color: #2563eb;
+}
+
+.qf-btn.active {
+  background: #2563eb;
+  color: white;
+  border-color: #2563eb;
+}
