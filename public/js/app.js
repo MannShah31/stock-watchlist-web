@@ -13,9 +13,11 @@ let userId = null;
 let watchlist = [];
 let alerts = null;
 let indicesInterval = null;
+let watchlistInterval = null; // 🔥 NEW
 
 window.currentUser = null;
-window.quickFilter = "all"; // 🔥 default quick filter
+window.quickFilter = "all";
+window.watchlistInstance = null; // 🔥 NEW
 
 /* ================== DOM ================== */
 const loginScreen = document.getElementById("loginScreen");
@@ -48,9 +50,25 @@ function resetScroll() {
   window.scrollTo({ top: 0, left: 0, behavior: "instant" });
 }
 
+/* ================== WATCHLIST AUTO REFRESH ================== */
+function startWatchlistAutoRefresh() {
+  stopWatchlistAutoRefresh();
+  if (!window.watchlistInstance) return;
+
+  watchlistInterval = setInterval(() => {
+    window.watchlistInstance.render();
+  }, 60 * 1000); // 60 sec
+}
+
+function stopWatchlistAutoRefresh() {
+  if (watchlistInterval) {
+    clearInterval(watchlistInterval);
+    watchlistInterval = null;
+  }
+}
+
 /* ================== FILTER BUILDER ================== */
 function populateFiltersFromWatchlist(watchlist) {
-
   const industries = [...new Set(watchlist.map(s => s.industry))].filter(Boolean);
   const categories = [...new Set(watchlist.map(s => s.category))].filter(Boolean);
 
@@ -132,7 +150,6 @@ async function loadIndices() {
 
     renderGroup("Nifty 50", data.nifty50 || []);
     renderGroup("Sensex", data.sensex || []);
-
   } catch (e) {
     console.error("Failed to load indices", e);
   }
@@ -166,8 +183,6 @@ setupAuth({
     loginScreen.style.display = "none";
     appScreen.style.display = "block";
 
-    resetScroll();
-
     tabWatch.classList.add("active");
     tabAlerts.classList.remove("active");
     tabIndices.classList.remove("active");
@@ -189,6 +204,8 @@ setupAuth({
       setWatchlist: v => (watchlist = v)
     });
 
+    window.watchlistInstance = wl; // 🔥 store instance
+
     alerts = setupAlerts({
       alertSymbol,
       alertPrice,
@@ -206,10 +223,11 @@ setupAuth({
     );
 
     wl.render();
+    startWatchlistAutoRefresh(); // 🔥 start auto refresh
+
     alerts.populateDropdown();
     alerts.loadAlerts();
 
-    /* 🔥 FILTER LISTENERS */
     document.getElementById("industryFilter")
       ?.addEventListener("change", () => wl.render());
 
@@ -228,7 +246,6 @@ setupAuth({
         wl.render();
       });
 
-    /* 🔥 QUICK FILTER BUTTONS */
     document.getElementById("filterAll")
       ?.addEventListener("click", () => setQuickFilter("all", wl));
 
@@ -240,6 +257,7 @@ setupAuth({
   },
 
   onLogout: () => {
+    stopWatchlistAutoRefresh();
     stopIndicesAutoRefresh();
 
     userId = null;
@@ -247,6 +265,7 @@ setupAuth({
     alerts = null;
     window.currentUser = null;
     window.quickFilter = "all";
+    window.watchlistInstance = null;
 
     alertList.innerHTML = "";
     alertSymbol.innerHTML = "";
@@ -261,6 +280,7 @@ setupAuth({
 tabWatch.onclick = () => {
   resetScroll();
   stopIndicesAutoRefresh();
+  startWatchlistAutoRefresh();
 
   tabWatch.classList.add("active");
   tabAlerts.classList.remove("active");
@@ -273,6 +293,7 @@ tabWatch.onclick = () => {
 
 tabAlerts.onclick = () => {
   resetScroll();
+  stopWatchlistAutoRefresh();
   stopIndicesAutoRefresh();
 
   tabAlerts.classList.add("active");
@@ -291,6 +312,7 @@ tabAlerts.onclick = () => {
 
 tabIndices.onclick = () => {
   resetScroll();
+  stopWatchlistAutoRefresh();
 
   tabIndices.classList.add("active");
   tabWatch.classList.remove("active");
