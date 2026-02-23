@@ -15,6 +15,7 @@ let alerts = null;
 let indicesInterval = null;
 
 window.currentUser = null;
+window.quickFilter = "all"; // 🔥 default quick filter
 
 /* ================== DOM ================== */
 const loginScreen = document.getElementById("loginScreen");
@@ -74,6 +75,24 @@ function populateFiltersFromWatchlist(watchlist) {
     opt.textContent = c;
     cSelect.appendChild(opt);
   });
+}
+
+/* ================== QUICK FILTER ================== */
+function setQuickFilter(type, wl) {
+  window.quickFilter = type;
+
+  document.querySelectorAll(".qf-btn").forEach(btn =>
+    btn.classList.remove("active")
+  );
+
+  const btnId =
+    type === "all" ? "filterAll" :
+    type === "gainers" ? "filterGainers" :
+    "filterLosers";
+
+  document.getElementById(btnId)?.classList.add("active");
+
+  wl.render();
 }
 
 /* ================== INDICES ================== */
@@ -157,7 +176,6 @@ setupAuth({
     alertsTab.style.display = "none";
     indicesTab.style.display = "none";
 
-    // 🔥 Load full enriched stock dataset
     window.allStocks = await getAllStocks();
 
     const snap = await getDoc(doc(db, "users", userId));
@@ -180,7 +198,6 @@ setupAuth({
       getWatchlist: () => watchlist
     });
 
-    // 🔥 Build filters from enriched watchlist
     populateFiltersFromWatchlist(
       watchlist.map(s => {
         const full = window.allStocks.find(x => x.symbol === s.symbol);
@@ -192,7 +209,7 @@ setupAuth({
     alerts.populateDropdown();
     alerts.loadAlerts();
 
-    // 🔥 Filter listeners
+    /* 🔥 FILTER LISTENERS */
     document.getElementById("industryFilter")
       ?.addEventListener("change", () => wl.render());
 
@@ -203,8 +220,23 @@ setupAuth({
       ?.addEventListener("click", () => {
         document.getElementById("industryFilter").value = "";
         document.getElementById("categoryFilter").value = "";
+        window.quickFilter = "all";
+        document.querySelectorAll(".qf-btn").forEach(btn =>
+          btn.classList.remove("active")
+        );
+        document.getElementById("filterAll")?.classList.add("active");
         wl.render();
       });
+
+    /* 🔥 QUICK FILTER BUTTONS */
+    document.getElementById("filterAll")
+      ?.addEventListener("click", () => setQuickFilter("all", wl));
+
+    document.getElementById("filterGainers")
+      ?.addEventListener("click", () => setQuickFilter("gainers", wl));
+
+    document.getElementById("filterLosers")
+      ?.addEventListener("click", () => setQuickFilter("losers", wl));
   },
 
   onLogout: () => {
@@ -214,6 +246,7 @@ setupAuth({
     watchlist = [];
     alerts = null;
     window.currentUser = null;
+    window.quickFilter = "all";
 
     alertList.innerHTML = "";
     alertSymbol.innerHTML = "";
