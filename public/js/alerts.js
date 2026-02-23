@@ -3,6 +3,8 @@ import {
   collection,
   addDoc,
   getDocs,
+  onSnapshot,
+  query,
   updateDoc
 } from "https://www.gstatic.com/firebasejs/12.8.0/firebase-firestore.js";
 
@@ -17,6 +19,33 @@ export function setupAlerts({
   getWatchlist
 }) {
 
+  let shownNotifications = new Set();
+
+  /* ================= DESKTOP NOTIFICATION ================= */
+
+  function requestNotificationPermission() {
+    if (!("Notification" in window)) return;
+
+    if (Notification.permission !== "granted") {
+      Notification.requestPermission();
+    }
+  }
+
+  function showDesktopNotification(symbol, target) {
+    if (!("Notification" in window)) return;
+    if (Notification.permission !== "granted") return;
+
+    const notification = new Notification("🔔 Stock Alert Triggered!", {
+      body: `${symbol} crossed ₹${target}`,
+      icon: "/favicon.ico"
+    });
+
+    notification.onclick = () => {
+      window.focus();
+      notification.close();
+    };
+  }
+
   /* ---------- POPULATE DROPDOWN ---------- */
   function populateDropdown() {
     alertSymbol.innerHTML = "";
@@ -29,7 +58,48 @@ export function setupAlerts({
     });
   }
 
-  /* ---------- LOAD ALERTS ---------- */
+  /* ---------- REAL-TIME LISTENER ---------- */
+  function startRealtimeListener() {
+    const q = query(
+      collection(db, "users", getUserId(), "alerts")
+    );
+
+    onSnapshot(q, snapshot => {
+
+      alertList.innerHTML = "";
+
+      if (snapshot.empty) {
+        alertList.innerHTML = `<p style="opacity:.5">No alerts set</p>`;
+        return;
+      }
+
+      snapshot.forEach(docSnap => {
+
+        const a = docSnap.data();
+        const alertId = docSnap.id;
+
+        const div = document.createElement("div");
+        div.className = "alert-item";
+
+        div.innerHTML = `
+          <span>${a.symbol}</span>
+          <span>₹${a.price}</span>
+          <span>${a.triggered ? "✅ Triggered" : "⏳ Waiting"}</span>
+        `;
+
+        alertList.appendChild(div);
+
+        // 🔥 SHOW DESKTOP POPUP ONLY ON FIRST TRIGGER
+        if (a.triggered && !shownNotifications.has(alertId)) {
+          showDesktopNotification(a.symbol, a.price);
+          shownNotifications.add(alertId);
+        }
+
+      });
+    });
+  }
+
+  /* ---------- LOAD ALERTS (fallback manual load) ---------- */
   async function loadAlerts() {
     alertList.innerHTML = "";
 
@@ -79,8 +149,12 @@ export function setupAlerts({
     );
 
     alertPrice.value = "";
-    loadAlerts();
   };
+
+  /* ================= INIT ================= */
+
+  requestNotificationPermission();
+  startRealtimeListener();
 
   return {
     populateDropdown,
