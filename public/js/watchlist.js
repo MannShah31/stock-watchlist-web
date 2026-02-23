@@ -59,112 +59,110 @@ export function setupWatchlist({
 
   /* ---------- RENDER ---------- */
   async function render() {
-  const rawList = getWatchlist();
 
-  // 🔥 STEP 1: BUILD FAST LOOKUP MAP
-  const stockMap = Object.fromEntries(
-    window.allStocks.map(s => [
-      s.symbol.trim().toUpperCase(),
-      s
-    ])
-  );
+    const rawList = getWatchlist();
 
-  // 🔥 STEP 2: ALWAYS USE ENRICHED VERSION
-  let list = rawList.map(s => {
-    const key = s.symbol?.trim().toUpperCase();
-    return stockMap[key] || s;
-  });
+    // 🔥 Build fast lookup map for enriched data
+    const stockMap = Object.fromEntries(
+      window.allStocks.map(s => [
+        s.symbol.trim().toUpperCase(),
+        s
+      ])
+    );
 
-  console.log("✅ Enriched list sample:", list[0]);
+    // 🔥 Always use enriched stock objects
+    let list = rawList.map(s => {
+      const key = s.symbol?.trim().toUpperCase();
+      return stockMap[key] || s;
+    });
 
-  // 🔥 STEP 3: APPLY FILTER
-  const industry = document.getElementById("industryFilter")?.value;
-  const category = document.getElementById("categoryFilter")?.value;
+    // 🔥 Apply filters (single dropdown version)
+    const industry = document.getElementById("industryFilter")?.value;
+    const category = document.getElementById("categoryFilter")?.value;
 
-  if (industry || category) {
-    list = list.filter(s => {
-      return (
+    if (industry || category) {
+      list = list.filter(s =>
         (!industry || s.industry === industry) &&
         (!category || s.category === category)
       );
-    });
-  }
+    }
 
-  tableBody.innerHTML = "";
+    tableBody.innerHTML = "";
 
-  if (!list.length) {
-    tableBody.innerHTML = `
-      <tr>
-        <td colspan="9" style="opacity:.5">
-          No stocks match selected filters
+    if (!list.length) {
+      tableBody.innerHTML = `
+        <tr>
+          <td colspan="9" style="opacity:.5">
+            No stocks match selected filters
+          </td>
+        </tr>`;
+      return;
+    }
+
+    const priceData = await getPrices(list.map(s => s.symbol));
+
+    for (const s of list) {
+
+      const d = priceData[s.symbol];
+      if (!d) continue;
+
+      const screenerSymbol = s.symbol
+        .replace(".NS", "")
+        .replace(".BO", "");
+
+      const tr = document.createElement("tr");
+
+      tr.innerHTML = `
+        <td>
+          <a href="https://www.screener.in/company/${screenerSymbol}/"
+             target="_blank"
+             style="color:#60a5fa;text-decoration:none;font-weight:600">
+            ${s.name}
+          </a>
         </td>
-      </tr>`;
-    return;
+
+        <td>₹${d.price?.toFixed(2) ?? "-"}</td>
+
+        <td class="${d.dayChange >= 0 ? "pos" : "neg"}">
+          ₹${d.dayChange?.toFixed(2) ?? "-"}
+        </td>
+
+        <td class="${d.weekChange >= 0 ? "pos" : "neg"}">
+          ${d.weekChange?.toFixed(2) ?? "-"}%
+        </td>
+
+        <td class="${d.monthChange >= 0 ? "pos" : "neg"}">
+          ${d.monthChange?.toFixed(2) ?? "-"}%
+        </td>
+
+        <td class="${d.threeMonthChange >= 0 ? "pos" : "neg"}">
+          ${d.threeMonthChange?.toFixed(2) ?? "-"}%
+        </td>
+
+        <td>${d.high52?.toFixed(2) ?? "-"}</td>
+        <td>${d.low52?.toFixed(2) ?? "-"}</td>
+
+        <td>
+          <button class="remove-btn" data-sym="${s.symbol}">✕</button>
+        </td>
+      `;
+
+      tr.querySelector(".remove-btn").onclick = async () => {
+        let updated = getWatchlist().filter(x => x.symbol !== s.symbol);
+
+        await setDoc(
+          doc(db, "users", getUserId()),
+          { watchlist: updated },
+          { merge: true }
+        );
+
+        setWatchlist(updated);
+        render();
+      };
+
+      tableBody.appendChild(tr);
+    }
   }
-
-  const priceData = await getPrices(list.map(s => s.symbol));
-
-  for (const s of list) {
-    const d = priceData[s.symbol];
-    if (!d) continue;
-
-    const screenerSymbol = s.symbol
-      .replace(".NS", "")
-      .replace(".BO", "");
-
-    const tr = document.createElement("tr");
-
-    tr.innerHTML = `
-      <td>
-        <a href="https://www.screener.in/company/${screenerSymbol}/"
-           target="_blank"
-           style="color:#60a5fa;text-decoration:none;font-weight:600">
-          ${s.name}
-        </a>
-      </td>
-
-      <td>₹${d.price?.toFixed(2) ?? "-"}</td>
-
-      <td class="${d.dayChange >= 0 ? "pos" : "neg"}">
-        ₹${d.dayChange?.toFixed(2) ?? "-"}
-      </td>
-
-      <td class="${d.weekChange >= 0 ? "pos" : "neg"}">
-        ${d.weekChange?.toFixed(2) ?? "-"}%
-      </td>
-
-      <td class="${d.monthChange >= 0 ? "pos" : "neg"}">
-        ${d.monthChange?.toFixed(2) ?? "-"}%
-      </td>
-
-      <td class="${d.threeMonthChange >= 0 ? "pos" : "neg"}">
-        ${d.threeMonthChange?.toFixed(2) ?? "-"}%
-      </td>
-
-      <td>${d.high52?.toFixed(2) ?? "-"}</td>
-      <td>${d.low52?.toFixed(2) ?? "-"}</td>
-
-      <td>
-        <button class="remove-btn" data-sym="${s.symbol}">✕</button>
-      </td>
-    `;
-
-    tr.querySelector(".remove-btn").onclick = async () => {
-      let updated = getWatchlist().filter(x => x.symbol !== s.symbol);
-
-      await setDoc(
-        doc(db, "users", getUserId()),
-        { watchlist: updated },
-        { merge: true }
-      );
-
-      setWatchlist(updated);
-      render();
-    };
-
-    tableBody.appendChild(tr);
-  }
-}
 
   return { render };
 }
