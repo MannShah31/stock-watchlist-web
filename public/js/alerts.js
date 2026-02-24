@@ -1,11 +1,10 @@
 import {
-  doc,
   collection,
   addDoc,
   getDocs,
   onSnapshot,
-  query,
-  updateDoc
+  deleteDoc,
+  doc
 } from "https://www.gstatic.com/firebasejs/12.8.0/firebase-firestore.js";
 
 import { db } from "./firebase.js";
@@ -19,8 +18,6 @@ export function setupAlerts({
   getWatchlist
 }) {
 
-  let shownNotifications = new Set();
-
   /* ================= DESKTOP NOTIFICATION ================= */
 
   function requestNotificationPermission() {
@@ -31,52 +28,23 @@ export function setupAlerts({
     }
   }
 
-function startRealtimeListener() {
+  function showDesktopNotification(symbol, target) {
+    if (!("Notification" in window)) return;
+    if (Notification.permission !== "granted") return;
 
-  const alertsRef = collection(db, "users", getUserId(), "alerts");
-
-  onSnapshot(alertsRef, snapshot => {
-
-    alertList.innerHTML = "";
-
-    if (snapshot.empty) {
-      alertList.innerHTML = `<p style="opacity:.5">No alerts set</p>`;
-      return;
-    }
-
-    snapshot.forEach(docSnap => {
-
-      const a = docSnap.data();
-      const alertId = docSnap.id;
-
-      const div = document.createElement("div");
-      div.className = "alert-item";
-
-      div.innerHTML = `
-        <span>${a.symbol}</span>
-        <span>₹${a.price}</span>
-        <span>${a.triggered ? "✅ Triggered" : "⏳ Waiting"}</span>
-      `;
-
-      alertList.appendChild(div);
+    const notification = new Notification("🔔 Stock Alert Triggered!", {
+      body: `${symbol} crossed ₹${target}`,
+      icon: "/favicon.ico"
     });
 
-    // 🔥 THIS IS THE IMPORTANT PART
-    snapshot.docChanges().forEach(change => {
+    notification.onclick = () => {
+      window.focus();
+      notification.close();
+    };
+  }
 
-      if (
-        change.type === "modified" &&
-        change.doc.data().triggered === true
-      ) {
-        const a = change.doc.data();
+  /* ================= POPULATE DROPDOWN ================= */
 
-        showDesktopNotification(a.symbol, a.price);
-      }
-    });
-
-  });
-}
-  /* ---------- POPULATE DROPDOWN ---------- */
   function populateDropdown() {
     alertSymbol.innerHTML = "";
 
@@ -88,13 +56,13 @@ function startRealtimeListener() {
     });
   }
 
-  /* ---------- REAL-TIME LISTENER ---------- */
-  function startRealtimeListener() {
-    const q = query(
-      collection(db, "users", getUserId(), "alerts")
-    );
+  /* ================= REALTIME LISTENER ================= */
 
-    onSnapshot(q, snapshot => {
+  function startRealtimeListener() {
+
+    const alertsRef = collection(db, "users", getUserId(), "alerts");
+
+    onSnapshot(alertsRef, snapshot => {
 
       alertList.innerHTML = "";
 
@@ -115,51 +83,43 @@ function startRealtimeListener() {
           <span>${a.symbol}</span>
           <span>₹${a.price}</span>
           <span>${a.triggered ? "✅ Triggered" : "⏳ Waiting"}</span>
+          <button class="remove-alert" data-id="${alertId}">✕</button>
         `;
 
         alertList.appendChild(div);
 
-        // 🔥 SHOW DESKTOP POPUP ONLY ON FIRST TRIGGER
-        if (a.triggered && !shownNotifications.has(alertId)) {
-          showDesktopNotification(a.symbol, a.price);
-          shownNotifications.add(alertId);
-        }
+        // 🔥 Show popup only when modified → triggered = true
+        snapshot.docChanges().forEach(change => {
+          if (
+            change.type === "modified" &&
+            change.doc.id === alertId &&
+            change.doc.data().triggered === true
+          ) {
+            showDesktopNotification(a.symbol, a.price);
+          }
+        });
 
       });
+
+      /* ===== REMOVE BUTTON HANDLER ===== */
+
+      document.querySelectorAll(".remove-alert").forEach(btn => {
+        btn.onclick = async () => {
+          const id = btn.dataset.id;
+
+          await deleteDoc(
+            doc(db, "users", getUserId(), "alerts", id)
+          );
+        };
+      });
+
     });
   }
 
-  /* ---------- LOAD ALERTS (fallback manual load) ---------- */
-  async function loadAlerts() {
-    alertList.innerHTML = "";
+  /* ================= ADD ALERT ================= */
 
-    const snap = await getDocs(
-      collection(db, "users", getUserId(), "alerts")
-    );
-
-    if (snap.empty) {
-      alertList.innerHTML = `<p style="opacity:.5">No alerts set</p>`;
-      return;
-    }
-
-    snap.forEach(docSnap => {
-      const a = docSnap.data();
-
-      const div = document.createElement("div");
-      div.className = "alert-item";
-
-      div.innerHTML = `
-        <span>${a.symbol}</span>
-        <span>₹${a.price}</span>
-        <span>${a.triggered ? "✅ Triggered" : "⏳ Waiting"}</span>
-      `;
-
-      alertList.appendChild(div);
-    });
-  }
-
-  /* ---------- ADD ALERT ---------- */
   addAlertBtn.onclick = async () => {
+
     const symbol = alertSymbol.value;
     const price = parseFloat(alertPrice.value);
 
@@ -187,7 +147,6 @@ function startRealtimeListener() {
   startRealtimeListener();
 
   return {
-    populateDropdown,
-    loadAlerts
+    populateDropdown
   };
 }
