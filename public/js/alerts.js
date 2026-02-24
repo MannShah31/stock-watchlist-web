@@ -1,10 +1,9 @@
 import {
+  doc,
   collection,
   addDoc,
   getDocs,
-  onSnapshot,
-  deleteDoc,
-  doc
+  onSnapshot
 } from "https://www.gstatic.com/firebasejs/12.8.0/firebase-firestore.js";
 
 import { db } from "./firebase.js";
@@ -43,8 +42,7 @@ export function setupAlerts({
     };
   }
 
-  /* ================= POPULATE DROPDOWN ================= */
-
+  /* ---------- POPULATE DROPDOWN ---------- */
   function populateDropdown() {
     alertSymbol.innerHTML = "";
 
@@ -56,8 +54,7 @@ export function setupAlerts({
     });
   }
 
-  /* ================= REALTIME LISTENER ================= */
-
+  /* ---------- REALTIME LISTENER ---------- */
   function startRealtimeListener() {
 
     const alertsRef = collection(db, "users", getUserId(), "alerts");
@@ -74,7 +71,6 @@ export function setupAlerts({
       snapshot.forEach(docSnap => {
 
         const a = docSnap.data();
-        const alertId = docSnap.id;
 
         const div = document.createElement("div");
         div.className = "alert-item";
@@ -83,43 +79,56 @@ export function setupAlerts({
           <span>${a.symbol}</span>
           <span>₹${a.price}</span>
           <span>${a.triggered ? "✅ Triggered" : "⏳ Waiting"}</span>
-          <button class="remove-alert" data-id="${alertId}">✕</button>
         `;
 
         alertList.appendChild(div);
-
-        // 🔥 Show popup only when modified → triggered = true
-        snapshot.docChanges().forEach(change => {
-          if (
-            change.type === "modified" &&
-            change.doc.id === alertId &&
-            change.doc.data().triggered === true
-          ) {
-            showDesktopNotification(a.symbol, a.price);
-          }
-        });
-
       });
 
-      /* ===== REMOVE BUTTON HANDLER ===== */
-
-      document.querySelectorAll(".remove-alert").forEach(btn => {
-        btn.onclick = async () => {
-          const id = btn.dataset.id;
-
-          await deleteDoc(
-            doc(db, "users", getUserId(), "alerts", id)
-          );
-        };
+      // 🔥 Detect modified → triggered true
+      snapshot.docChanges().forEach(change => {
+        if (
+          change.type === "modified" &&
+          change.doc.data().triggered === true
+        ) {
+          const a = change.doc.data();
+          showDesktopNotification(a.symbol, a.price);
+        }
       });
 
     });
   }
 
-  /* ================= ADD ALERT ================= */
+  /* ---------- LOAD ALERTS (used by app.js) ---------- */
+  async function loadAlerts() {
+    alertList.innerHTML = "";
 
+    const snap = await getDocs(
+      collection(db, "users", getUserId(), "alerts")
+    );
+
+    if (snap.empty) {
+      alertList.innerHTML = `<p style="opacity:.5">No alerts set</p>`;
+      return;
+    }
+
+    snap.forEach(docSnap => {
+      const a = docSnap.data();
+
+      const div = document.createElement("div");
+      div.className = "alert-item";
+
+      div.innerHTML = `
+        <span>${a.symbol}</span>
+        <span>₹${a.price}</span>
+        <span>${a.triggered ? "✅ Triggered" : "⏳ Waiting"}</span>
+      `;
+
+      alertList.appendChild(div);
+    });
+  }
+
+  /* ---------- ADD ALERT ---------- */
   addAlertBtn.onclick = async () => {
-
     const symbol = alertSymbol.value;
     const price = parseFloat(alertPrice.value);
 
@@ -147,6 +156,7 @@ export function setupAlerts({
   startRealtimeListener();
 
   return {
-    populateDropdown
+    populateDropdown,
+    loadAlerts
   };
 }
