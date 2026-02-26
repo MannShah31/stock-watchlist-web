@@ -155,12 +155,48 @@ setupAuth({
 
     const snap = await getDoc(doc(db, "users", userId));
 
-    if (snap.exists() && snap.data().watchlists) {
-      watchlists = snap.data().watchlists;
-    } else {
-      watchlists = { Default: [] };
-      await saveWatchlists();
-    }
+    if (snap.exists()) {
+
+  const data = snap.data();
+
+  // 🔥 NEW STRUCTURE EXISTS
+  if (data.watchlists) {
+    watchlists = data.watchlists;
+  }
+
+  // 🔥 OLD STRUCTURE EXISTS → MIGRATE
+  else if (data.watchlist) {
+    watchlists = {
+      Default: data.watchlist
+    };
+
+    await setDoc(
+      doc(db, "users", userId),
+      { watchlists },
+      { merge: true }
+    );
+  }
+
+  // 🔥 Nothing exists → create fresh
+  else {
+    watchlists = { Default: [] };
+
+    await setDoc(
+      doc(db, "users", userId),
+      { watchlists },
+      { merge: true }
+    );
+  }
+
+} else {
+  watchlists = { Default: [] };
+
+  await setDoc(
+    doc(db, "users", userId),
+    { watchlists },
+    { merge: true }
+  );
+}
 
     currentWatchlistName = Object.keys(watchlists)[0];
 
