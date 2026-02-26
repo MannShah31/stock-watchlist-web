@@ -207,10 +207,10 @@ setupAuth({
       search,
       getUserId: () => userId,
       getWatchlist: getCurrentWatchlist,
-      setWatchlist: list => {
-        setCurrentWatchlist(list);
-        saveWatchlists();
-      }
+      setWatchlist: async list => {
+  setCurrentWatchlist(list);
+  await saveWatchlists();
+}
     });
 
     window.watchlistInstance = wl;
