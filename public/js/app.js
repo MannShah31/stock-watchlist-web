@@ -135,7 +135,22 @@ function populateFiltersFromWatchlist(list) {
     cSelect.appendChild(opt);
   });
 }
+function setQuickFilter(type) {
+  window.quickFilter = type;
 
+  document.querySelectorAll(".qf-btn").forEach(btn =>
+    btn.classList.remove("active")
+  );
+
+  const btnId =
+    type === "all" ? "filterAll" :
+    type === "gainers" ? "filterGainers" :
+    "filterLosers";
+
+  document.getElementById(btnId)?.classList.add("active");
+
+  window.watchlistInstance?.render();
+}
 /* ================== AUTH ================== */
 
 setupAuth({
@@ -219,6 +234,43 @@ setupAuth({
     alerts.loadAlerts();
 
     populateFiltersFromWatchlist(getCurrentWatchlist());
+    /* 🔥 FILTER LISTENERS */
+
+document.getElementById("industryFilter")
+  ?.addEventListener("change", () => {
+    window.watchlistInstance?.render();
+  });
+
+document.getElementById("categoryFilter")
+  ?.addEventListener("change", () => {
+    window.watchlistInstance?.render();
+  });
+
+document.getElementById("clearFilters")
+  ?.addEventListener("click", () => {
+    document.getElementById("industryFilter").value = "";
+    document.getElementById("categoryFilter").value = "";
+    window.quickFilter = "all";
+
+    document.querySelectorAll(".qf-btn").forEach(btn =>
+      btn.classList.remove("active")
+    );
+
+    document.getElementById("filterAll")?.classList.add("active");
+
+    window.watchlistInstance?.render();
+  });
+
+/* 🔥 QUICK FILTER BUTTONS */
+
+document.getElementById("filterAll")
+  ?.addEventListener("click", () => setQuickFilter("all"));
+
+document.getElementById("filterGainers")
+  ?.addEventListener("click", () => setQuickFilter("gainers"));
+
+document.getElementById("filterLosers")
+  ?.addEventListener("click", () => setQuickFilter("losers"));
   },
 
   onLogout: () => {
