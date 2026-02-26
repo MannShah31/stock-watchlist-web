@@ -1,38 +1,44 @@
 import { getPrices } from "./api.js";
 
 export function setupWatchlist({
-  dropdown,
-  search,
-  getUserId,      // still passed but not used directly now
   getWatchlist,
   setWatchlist
 }) {
 
   const tableBody = document.getElementById("stockTableBody");
 
+  // 🔥 Always grab fresh DOM references
+  const searchInput = document.getElementById("search");
+  const dropdownBox = document.getElementById("dropdown");
+
   // 🔥 Store previous prices for flash comparison
   const previousPrices = {};
 
   /* ================= SEARCH ================= */
 
-  search.addEventListener("input", e => {
+  searchInput.addEventListener("input", e => {
+
     const q = e.target.value.toLowerCase().trim();
-    dropdown.innerHTML = "";
+    dropdownBox.innerHTML = "";
+
     if (!q) return;
 
-    window.allStocks
-      .filter(s =>
-        s.name.toLowerCase().includes(q) ||
-        s.symbol.toLowerCase().includes(q)
-      )
-      .slice(0, 10)
-      .forEach(s => {
-        const d = document.createElement("div");
-        d.className = "option";
-        d.textContent = `${s.name} (${s.symbol})`;
-        d.onclick = () => addStock(s);
-        dropdown.appendChild(d);
-      });
+    const results = window.allStocks
+      .filter(s => {
+        const name = (s.name || "").toLowerCase();
+        const symbol = (s.symbol || "").toLowerCase();
+        return name.includes(q) || symbol.includes(q);
+      })
+      .slice(0, 10);
+
+    results.forEach(s => {
+      const d = document.createElement("div");
+      d.className = "option";
+      d.textContent = `${s.name} (${s.symbol})`;
+      d.onclick = () => addStock(s);
+      dropdownBox.appendChild(d);
+    });
+
   });
 
   /* ================= ADD STOCK ================= */
@@ -45,11 +51,10 @@ export function setupWatchlist({
 
     list = [...list, s];
 
-    // 🔥 IMPORTANT → only use setWatchlist
     await setWatchlist(list);
 
-    dropdown.innerHTML = "";
-    search.value = "";
+    dropdownBox.innerHTML = "";
+    searchInput.value = "";
 
     render();
   }
@@ -60,7 +65,7 @@ export function setupWatchlist({
 
     const rawList = getWatchlist();
 
-    // 🔥 Build enriched stock map
+    // 🔥 Enrich stock objects
     const stockMap = Object.fromEntries(
       window.allStocks.map(s => [
         s.symbol.trim().toUpperCase(),
@@ -84,6 +89,8 @@ export function setupWatchlist({
         (!category || s.category === category)
       );
     }
+
+    /* ===== No Stocks Case ===== */
 
     if (!list.length) {
       tableBody.innerHTML = `
@@ -185,6 +192,7 @@ export function setupWatchlist({
       /* ===== Price Flash Animation ===== */
 
       if (oldPrice !== undefined && newPrice !== oldPrice) {
+
         const priceCell = tr.querySelector(".price-cell");
 
         if (newPrice > oldPrice) {
