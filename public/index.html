@@ -42,7 +42,26 @@
 
 <div class="app-wrap">
 
-  <!-- 🔽 FILTER BAR -->
+  <!-- ================= WATCHLIST HEADER (NEW) ================= -->
+  <div class="watchlist-header">
+
+    <div class="watchlist-selector-group">
+      <label>Watchlist</label>
+      <select id="watchlistSelector"></select>
+    </div>
+
+    <div class="watchlist-actions">
+      <button id="createWatchlistBtn" class="primary-btn">
+        + New
+      </button>
+      <button id="deleteWatchlistBtn" class="danger-btn">
+        Delete
+      </button>
+    </div>
+
+  </div>
+
+  <!-- ================= FILTER BAR ================= -->
   <div class="filter-bar">
 
     <div class="filter-group">
@@ -59,9 +78,11 @@
       </select>
     </div>
 
-    <button id="clearFilters" class="clear-btn">Clear</button>
+    <button id="clearFilters" class="clear-btn">
+      Clear
+    </button>
 
-    <!-- 🔥 QUICK FILTER BUTTONS (NEW) -->
+    <!-- QUICK FILTERS -->
     <div class="quick-filters">
       <button id="filterAll" class="qf-btn active">All</button>
       <button id="filterGainers" class="qf-btn">Gainers</button>
@@ -70,7 +91,7 @@
 
   </div>
 
-  <!-- ========== WATCHLIST TAB ========== -->
+  <!-- ================= WATCHLIST TAB ================= -->
   <div id="watchTab">
 
     <div class="search-card">
@@ -99,7 +120,7 @@
 
   </div>
 
-  <!-- ========== ALERTS TAB ========== -->
+  <!-- ================= ALERTS TAB ================= -->
   <div id="alertsTab" style="display:none">
     <div class="alert-card">
       <h3>🔔 Price Alerts</h3>
@@ -114,7 +135,7 @@
     </div>
   </div>
 
-  <!-- ========== INDICES TAB ========== -->
+  <!-- ================= INDICES TAB ================= -->
   <div id="indicesTab" style="display:none">
     <div class="alert-card">
       <h3>📊 Market Indices</h3>
