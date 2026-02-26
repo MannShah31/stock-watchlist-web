@@ -11,7 +11,7 @@ import { db } from "./firebase.js";
 
 /* ================== STATE ================== */
 let userId = null;
-let watchlists = {};           // 🔥 multiple watchlists
+let watchlists = {};
 let currentWatchlistName = "Default";
 let alerts = null;
 let indicesInterval = null;
@@ -43,26 +43,10 @@ const deleteWatchlistBtn = document.getElementById("deleteWatchlistBtn");
 
 const indicesTableBody = document.getElementById("indicesTableBody");
 
-const tabWatch = document.getElementById("tabWatch");
-const tabAlerts = document.getElementById("tabAlerts");
-const tabIndices = document.getElementById("tabIndices");
-
-const watchTab = document.getElementById("watchTab");
-const alertsTab = document.getElementById("alertsTab");
-const indicesTab = document.getElementById("indicesTab");
-
 /* ================== HELPERS ================== */
-
-function resetScroll() {
-  window.scrollTo({ top: 0, left: 0, behavior: "instant" });
-}
 
 function getCurrentWatchlist() {
   return watchlists[currentWatchlistName] || [];
-}
-
-function setCurrentWatchlist(list) {
-  watchlists[currentWatchlistName] = list;
 }
 
 async function saveWatchlists() {
@@ -73,27 +57,9 @@ async function saveWatchlists() {
   );
 }
 
-/* ================== AUTO REFRESH ================== */
-
-function startWatchlistAutoRefresh() {
-  stopWatchlistAutoRefresh();
-  if (!window.watchlistInstance) return;
-
-  watchlistInterval = setInterval(() => {
-    window.watchlistInstance.render();
-  }, 60 * 1000);
-}
-
-function stopWatchlistAutoRefresh() {
-  if (watchlistInterval) {
-    clearInterval(watchlistInterval);
-    watchlistInterval = null;
-  }
-}
-
-/* ================== WATCHLIST SELECTOR ================== */
-
 function rebuildWatchlistSelector() {
+  if (!watchlistSelector) return;
+
   watchlistSelector.innerHTML = "";
 
   Object.keys(watchlists).forEach(name => {
@@ -103,7 +69,42 @@ function rebuildWatchlistSelector() {
     watchlistSelector.appendChild(opt);
   });
 
+  if (!watchlists[currentWatchlistName]) {
+    currentWatchlistName = Object.keys(watchlists)[0];
+  }
+
   watchlistSelector.value = currentWatchlistName;
+}
+
+/* ================== AUTO REFRESH ================== */
+
+function startWatchlistAutoRefresh() {
+  stopWatchlistAutoRefresh();
+  if (!window.watchlistInstance) return;
+
+  watchlistInterval = setInterval(() => {
+    window.watchlistInstance.render();
+  }, 60000);
+}
+
+function stopWatchlistAutoRefresh() {
+  if (watchlistInterval) {
+    clearInterval(watchlistInterval);
+    watchlistInterval = null;
+  }
+}
+
+function startIndicesAutoRefresh() {
+  stopIndicesAutoRefresh();
+  loadIndices();
+  indicesInterval = setInterval(loadIndices, 300000);
+}
+
+function stopIndicesAutoRefresh() {
+  if (indicesInterval) {
+    clearInterval(indicesInterval);
+    indicesInterval = null;
+  }
 }
 
 /* ================== FILTER BUILDER ================== */
@@ -145,6 +146,7 @@ setupAuth({
   appScreen,
 
   onLogin: async user => {
+
     userId = user.uid;
     window.currentUser = user;
 
@@ -153,50 +155,36 @@ setupAuth({
 
     window.allStocks = await getAllStocks();
 
-    const snap = await getDoc(doc(db, "users", userId));
+    const userRef = doc(db, "users", userId);
+    const snap = await getDoc(userRef);
 
     if (snap.exists()) {
+      const data = snap.data();
 
-  const data = snap.data();
+      if (data.watchlists && typeof data.watchlists === "object") {
+        watchlists = data.watchlists;
+      }
+      else if (data.watchlist && Array.isArray(data.watchlist)) {
+        watchlists = { Default: data.watchlist };
 
-  // 🔥 NEW STRUCTURE EXISTS
-  if (data.watchlists) {
-    watchlists = data.watchlists;
-  }
+        await setDoc(userRef, {
+          watchlists,
+          watchlist: null
+        }, { merge: true });
+      }
+      else {
+        watchlists = { Default: [] };
+        await setDoc(userRef, { watchlists }, { merge: true });
+      }
+    } else {
+      watchlists = { Default: [] };
+      await setDoc(userRef, { watchlists });
+    }
 
-  // 🔥 OLD STRUCTURE EXISTS → MIGRATE
-  else if (data.watchlist) {
-    watchlists = {
-      Default: data.watchlist
-    };
-
-    await setDoc(
-      doc(db, "users", userId),
-      { watchlists },
-      { merge: true }
-    );
-  }
-
-  // 🔥 Nothing exists → create fresh
-  else {
-    watchlists = { Default: [] };
-
-    await setDoc(
-      doc(db, "users", userId),
-      { watchlists },
-      { merge: true }
-    );
-  }
-
-} else {
-  watchlists = { Default: [] };
-
-  await setDoc(
-    doc(db, "users", userId),
-    { watchlists },
-    { merge: true }
-  );
-}
+    if (!Object.keys(watchlists).length) {
+      watchlists = { Default: [] };
+      await saveWatchlists();
+    }
 
     currentWatchlistName = Object.keys(watchlists)[0];
 
@@ -206,11 +194,11 @@ setupAuth({
       dropdown,
       search,
       getUserId: () => userId,
-      getWatchlist: getCurrentWatchlist,
+      getWatchlist: () => getCurrentWatchlist(),
       setWatchlist: async list => {
-  setCurrentWatchlist(list);
-  await saveWatchlists();
-}
+        watchlists[currentWatchlistName] = list;
+        await saveWatchlists();
+      }
     });
 
     window.watchlistInstance = wl;
@@ -221,7 +209,7 @@ setupAuth({
       addAlertBtn,
       alertList,
       getUserId: () => userId,
-      getWatchlist: getCurrentWatchlist
+      getWatchlist: () => getCurrentWatchlist()
     });
 
     wl.render();
@@ -240,8 +228,8 @@ setupAuth({
     userId = null;
     watchlists = {};
     alerts = null;
-    window.currentUser = null;
     window.watchlistInstance = null;
+    window.currentUser = null;
 
     loginScreen.style.display = "flex";
     appScreen.style.display = "none";
@@ -252,7 +240,7 @@ setupAuth({
 
 watchlistSelector?.addEventListener("change", () => {
   currentWatchlistName = watchlistSelector.value;
-  window.watchlistInstance.render();
+  window.watchlistInstance?.render();
   populateFiltersFromWatchlist(getCurrentWatchlist());
 });
 
@@ -265,7 +253,7 @@ createWatchlistBtn?.addEventListener("click", async () => {
 
   await saveWatchlists();
   rebuildWatchlistSelector();
-  window.watchlistInstance.render();
+  window.watchlistInstance?.render();
 });
 
 deleteWatchlistBtn?.addEventListener("click", async () => {
@@ -281,7 +269,7 @@ deleteWatchlistBtn?.addEventListener("click", async () => {
 
   await saveWatchlists();
   rebuildWatchlistSelector();
-  window.watchlistInstance.render();
+  window.watchlistInstance?.render();
 });
 
 /* ================== INDICES ================== */
@@ -290,6 +278,7 @@ async function loadIndices() {
   try {
     const res = await fetch("/api/indices");
     const data = await res.json();
+
     indicesTableBody.innerHTML = "";
 
     data.nifty50?.forEach(d => {
@@ -303,18 +292,5 @@ async function loadIndices() {
 
   } catch (e) {
     console.error("Indices error", e);
-  }
-}
-
-function startIndicesAutoRefresh() {
-  stopIndicesAutoRefresh();
-  loadIndices();
-  indicesInterval = setInterval(loadIndices, 5 * 60 * 1000);
-}
-
-function stopIndicesAutoRefresh() {
-  if (indicesInterval) {
-    clearInterval(indicesInterval);
-    indicesInterval = null;
   }
 }
