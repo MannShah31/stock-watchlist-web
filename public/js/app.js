@@ -4,20 +4,22 @@ import { setupWatchlist } from "./watchlist.js";
 import { setupAlerts } from "./alerts.js";
 import {
   doc,
-  getDoc
+  getDoc,
+  setDoc
 } from "https://www.gstatic.com/firebasejs/12.8.0/firebase-firestore.js";
 import { db } from "./firebase.js";
 
 /* ================== STATE ================== */
 let userId = null;
-let watchlist = [];
+let watchlists = {};           // 🔥 multiple watchlists
+let currentWatchlistName = "Default";
 let alerts = null;
 let indicesInterval = null;
-let watchlistInterval = null; // 🔥 NEW
+let watchlistInterval = null;
 
 window.currentUser = null;
 window.quickFilter = "all";
-window.watchlistInstance = null; // 🔥 NEW
+window.watchlistInstance = null;
 
 /* ================== DOM ================== */
 const loginScreen = document.getElementById("loginScreen");
@@ -35,6 +37,10 @@ const alertPrice = document.getElementById("alertPrice");
 const addAlertBtn = document.getElementById("addAlertBtn");
 const alertList = document.getElementById("alertList");
 
+const watchlistSelector = document.getElementById("watchlistSelector");
+const createWatchlistBtn = document.getElementById("createWatchlistBtn");
+const deleteWatchlistBtn = document.getElementById("deleteWatchlistBtn");
+
 const indicesTableBody = document.getElementById("indicesTableBody");
 
 const tabWatch = document.getElementById("tabWatch");
@@ -46,18 +52,36 @@ const alertsTab = document.getElementById("alertsTab");
 const indicesTab = document.getElementById("indicesTab");
 
 /* ================== HELPERS ================== */
+
 function resetScroll() {
   window.scrollTo({ top: 0, left: 0, behavior: "instant" });
 }
 
-/* ================== WATCHLIST AUTO REFRESH ================== */
+function getCurrentWatchlist() {
+  return watchlists[currentWatchlistName] || [];
+}
+
+function setCurrentWatchlist(list) {
+  watchlists[currentWatchlistName] = list;
+}
+
+async function saveWatchlists() {
+  await setDoc(
+    doc(db, "users", userId),
+    { watchlists },
+    { merge: true }
+  );
+}
+
+/* ================== AUTO REFRESH ================== */
+
 function startWatchlistAutoRefresh() {
   stopWatchlistAutoRefresh();
   if (!window.watchlistInstance) return;
 
   watchlistInterval = setInterval(() => {
     window.watchlistInstance.render();
-  }, 60 * 1000); // 60 sec
+  }, 60 * 1000);
 }
 
 function stopWatchlistAutoRefresh() {
@@ -67,10 +91,26 @@ function stopWatchlistAutoRefresh() {
   }
 }
 
+/* ================== WATCHLIST SELECTOR ================== */
+
+function rebuildWatchlistSelector() {
+  watchlistSelector.innerHTML = "";
+
+  Object.keys(watchlists).forEach(name => {
+    const opt = document.createElement("option");
+    opt.value = name;
+    opt.textContent = name;
+    watchlistSelector.appendChild(opt);
+  });
+
+  watchlistSelector.value = currentWatchlistName;
+}
+
 /* ================== FILTER BUILDER ================== */
-function populateFiltersFromWatchlist(watchlist) {
-  const industries = [...new Set(watchlist.map(s => s.industry))].filter(Boolean);
-  const categories = [...new Set(watchlist.map(s => s.category))].filter(Boolean);
+
+function populateFiltersFromWatchlist(list) {
+  const industries = [...new Set(list.map(s => s.industry))].filter(Boolean);
+  const categories = [...new Set(list.map(s => s.category))].filter(Boolean);
 
   const iSelect = document.getElementById("industryFilter");
   const cSelect = document.getElementById("categoryFilter");
@@ -95,63 +135,138 @@ function populateFiltersFromWatchlist(watchlist) {
   });
 }
 
-/* ================== QUICK FILTER ================== */
-function setQuickFilter(type, wl) {
-  window.quickFilter = type;
+/* ================== AUTH ================== */
 
-  document.querySelectorAll(".qf-btn").forEach(btn =>
-    btn.classList.remove("active")
-  );
+setupAuth({
+  loginBtn,
+  signupBtn,
+  logoutBtn,
+  loginScreen,
+  appScreen,
 
-  const btnId =
-    type === "all" ? "filterAll" :
-    type === "gainers" ? "filterGainers" :
-    "filterLosers";
+  onLogin: async user => {
+    userId = user.uid;
+    window.currentUser = user;
 
-  document.getElementById(btnId)?.classList.add("active");
+    loginScreen.style.display = "none";
+    appScreen.style.display = "block";
 
-  wl.render();
-}
+    window.allStocks = await getAllStocks();
+
+    const snap = await getDoc(doc(db, "users", userId));
+
+    if (snap.exists() && snap.data().watchlists) {
+      watchlists = snap.data().watchlists;
+    } else {
+      watchlists = { Default: [] };
+      await saveWatchlists();
+    }
+
+    currentWatchlistName = Object.keys(watchlists)[0];
+
+    rebuildWatchlistSelector();
+
+    const wl = setupWatchlist({
+      dropdown,
+      search,
+      getUserId: () => userId,
+      getWatchlist: getCurrentWatchlist,
+      setWatchlist: list => {
+        setCurrentWatchlist(list);
+        saveWatchlists();
+      }
+    });
+
+    window.watchlistInstance = wl;
+
+    alerts = setupAlerts({
+      alertSymbol,
+      alertPrice,
+      addAlertBtn,
+      alertList,
+      getUserId: () => userId,
+      getWatchlist: getCurrentWatchlist
+    });
+
+    wl.render();
+    startWatchlistAutoRefresh();
+
+    alerts.populateDropdown();
+    alerts.loadAlerts();
+
+    populateFiltersFromWatchlist(getCurrentWatchlist());
+  },
+
+  onLogout: () => {
+    stopWatchlistAutoRefresh();
+    stopIndicesAutoRefresh();
+
+    userId = null;
+    watchlists = {};
+    alerts = null;
+    window.currentUser = null;
+    window.watchlistInstance = null;
+
+    loginScreen.style.display = "flex";
+    appScreen.style.display = "none";
+  }
+});
+
+/* ================== WATCHLIST EVENTS ================== */
+
+watchlistSelector?.addEventListener("change", () => {
+  currentWatchlistName = watchlistSelector.value;
+  window.watchlistInstance.render();
+  populateFiltersFromWatchlist(getCurrentWatchlist());
+});
+
+createWatchlistBtn?.addEventListener("click", async () => {
+  const name = prompt("Enter new watchlist name:");
+  if (!name || watchlists[name]) return;
+
+  watchlists[name] = [];
+  currentWatchlistName = name;
+
+  await saveWatchlists();
+  rebuildWatchlistSelector();
+  window.watchlistInstance.render();
+});
+
+deleteWatchlistBtn?.addEventListener("click", async () => {
+  if (Object.keys(watchlists).length <= 1) {
+    alert("At least one watchlist required");
+    return;
+  }
+
+  if (!confirm(`Delete "${currentWatchlistName}"?`)) return;
+
+  delete watchlists[currentWatchlistName];
+  currentWatchlistName = Object.keys(watchlists)[0];
+
+  await saveWatchlists();
+  rebuildWatchlistSelector();
+  window.watchlistInstance.render();
+});
 
 /* ================== INDICES ================== */
+
 async function loadIndices() {
   try {
     const res = await fetch("/api/indices");
     const data = await res.json();
-
     indicesTableBody.innerHTML = "";
 
-    function renderGroup(title, stocks) {
-      const headerRow = document.createElement("tr");
-      headerRow.innerHTML = `
-        <td colspan="10" style="font-weight:700;color:#60a5fa;padding-top:20px;">
-          ${title}
-        </td>
+    data.nifty50?.forEach(d => {
+      const tr = document.createElement("tr");
+      tr.innerHTML = `
+        <td>${d.symbol.replace(".NS","")}</td>
+        <td>₹${d.price.toFixed(2)}</td>
       `;
-      indicesTableBody.appendChild(headerRow);
+      indicesTableBody.appendChild(tr);
+    });
 
-      stocks.forEach(d => {
-        const tr = document.createElement("tr");
-        tr.innerHTML = `
-          <td>${d.symbol.replace(".NS","")}</td>
-          <td>₹${d.price.toFixed(2)}</td>
-          <td class="${d.dayChange >= 0 ? "pos" : "neg"}">
-            ₹${d.dayChange?.toFixed(2) ?? "-"}
-          </td>
-          <td>${d.weekChange?.toFixed(2) ?? "-"}%</td>
-          <td>${d.monthChange?.toFixed(2) ?? "-"}%</td>
-          <td>${d.threeMonthChange?.toFixed(2) ?? "-"}%</td>
-          <td>${d.high52?.toFixed(2) ?? "-"}</td>
-          <td>${d.low52?.toFixed(2) ?? "-"}</td>
-        `;
-        indicesTableBody.appendChild(tr);
-      });
-    }
-
-    renderGroup("Nifty 50", data.nifty50 || []);
-    renderGroup("Sensex", data.sensex || []);
   } catch (e) {
-    console.error("Failed to load indices", e);
+    console.error("Indices error", e);
   }
 }
 
@@ -167,160 +282,3 @@ function stopIndicesAutoRefresh() {
     indicesInterval = null;
   }
 }
-
-/* ================== AUTH ================== */
-setupAuth({
-  loginBtn,
-  signupBtn,
-  logoutBtn,
-  loginScreen,
-  appScreen,
-
-  onLogin: async user => {
-    userId = user.uid;
-    window.currentUser = user;
-
-    loginScreen.style.display = "none";
-    appScreen.style.display = "block";
-
-    tabWatch.classList.add("active");
-    tabAlerts.classList.remove("active");
-    tabIndices.classList.remove("active");
-
-    watchTab.style.display = "block";
-    alertsTab.style.display = "none";
-    indicesTab.style.display = "none";
-
-    window.allStocks = await getAllStocks();
-
-    const snap = await getDoc(doc(db, "users", userId));
-    watchlist = snap.exists() ? snap.data().watchlist || [] : [];
-
-    const wl = setupWatchlist({
-      dropdown,
-      search,
-      getUserId: () => userId,
-      getWatchlist: () => watchlist,
-      setWatchlist: v => (watchlist = v)
-    });
-
-    window.watchlistInstance = wl; // 🔥 store instance
-
-    alerts = setupAlerts({
-      alertSymbol,
-      alertPrice,
-      addAlertBtn,
-      alertList,
-      getUserId: () => userId,
-      getWatchlist: () => watchlist
-    });
-
-    populateFiltersFromWatchlist(
-      watchlist.map(s => {
-        const full = window.allStocks.find(x => x.symbol === s.symbol);
-        return full || s;
-      })
-    );
-
-    wl.render();
-    startWatchlistAutoRefresh(); // 🔥 start auto refresh
-
-    alerts.populateDropdown();
-    alerts.loadAlerts();
-
-    document.getElementById("industryFilter")
-      ?.addEventListener("change", () => wl.render());
-
-    document.getElementById("categoryFilter")
-      ?.addEventListener("change", () => wl.render());
-
-    document.getElementById("clearFilters")
-      ?.addEventListener("click", () => {
-        document.getElementById("industryFilter").value = "";
-        document.getElementById("categoryFilter").value = "";
-        window.quickFilter = "all";
-        document.querySelectorAll(".qf-btn").forEach(btn =>
-          btn.classList.remove("active")
-        );
-        document.getElementById("filterAll")?.classList.add("active");
-        wl.render();
-      });
-
-    document.getElementById("filterAll")
-      ?.addEventListener("click", () => setQuickFilter("all", wl));
-
-    document.getElementById("filterGainers")
-      ?.addEventListener("click", () => setQuickFilter("gainers", wl));
-
-    document.getElementById("filterLosers")
-      ?.addEventListener("click", () => setQuickFilter("losers", wl));
-  },
-
-  onLogout: () => {
-    stopWatchlistAutoRefresh();
-    stopIndicesAutoRefresh();
-
-    userId = null;
-    watchlist = [];
-    alerts = null;
-    window.currentUser = null;
-    window.quickFilter = "all";
-    window.watchlistInstance = null;
-
-    alertList.innerHTML = "";
-    alertSymbol.innerHTML = "";
-    indicesTableBody.innerHTML = "";
-
-    loginScreen.style.display = "flex";
-    appScreen.style.display = "none";
-  }
-});
-
-/* ================== TAB SWITCHING ================== */
-tabWatch.onclick = () => {
-  resetScroll();
-  stopIndicesAutoRefresh();
-  startWatchlistAutoRefresh();
-
-  tabWatch.classList.add("active");
-  tabAlerts.classList.remove("active");
-  tabIndices.classList.remove("active");
-
-  watchTab.style.display = "block";
-  alertsTab.style.display = "none";
-  indicesTab.style.display = "none";
-};
-
-tabAlerts.onclick = () => {
-  resetScroll();
-  stopWatchlistAutoRefresh();
-  stopIndicesAutoRefresh();
-
-  tabAlerts.classList.add("active");
-  tabWatch.classList.remove("active");
-  tabIndices.classList.remove("active");
-
-  watchTab.style.display = "none";
-  alertsTab.style.display = "block";
-  indicesTab.style.display = "none";
-
-  if (alerts) {
-    alerts.populateDropdown();
-    alerts.loadAlerts();
-  }
-};
-
-tabIndices.onclick = () => {
-  resetScroll();
-  stopWatchlistAutoRefresh();
-
-  tabIndices.classList.add("active");
-  tabWatch.classList.remove("active");
-  tabAlerts.classList.remove("active");
-
-  watchTab.style.display = "none";
-  alertsTab.style.display = "none";
-  indicesTab.style.display = "block";
-
-  startIndicesAutoRefresh();
-};
