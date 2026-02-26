@@ -1,14 +1,9 @@
-import {
-  doc,
-  setDoc
-} from "https://www.gstatic.com/firebasejs/12.8.0/firebase-firestore.js";
-import { db } from "./firebase.js";
 import { getPrices } from "./api.js";
 
 export function setupWatchlist({
   dropdown,
   search,
-  getUserId,
+  getUserId,      // still passed but not used directly now
   getWatchlist,
   setWatchlist
 }) {
@@ -18,7 +13,8 @@ export function setupWatchlist({
   // 🔥 Store previous prices for flash comparison
   const previousPrices = {};
 
-  /* ---------- SEARCH ---------- */
+  /* ================= SEARCH ================= */
+
   search.addEventListener("input", e => {
     const q = e.target.value.toLowerCase().trim();
     dropdown.innerHTML = "";
@@ -39,31 +35,32 @@ export function setupWatchlist({
       });
   });
 
-  /* ---------- ADD STOCK ---------- */
+  /* ================= ADD STOCK ================= */
+
   async function addStock(s) {
+
     let list = getWatchlist();
 
     if (list.find(x => x.symbol === s.symbol)) return;
 
-    list.push(s);
+    list = [...list, s];
 
-    await setDoc(
-      doc(db, "users", getUserId()),
-      { watchlist: list },
-      { merge: true }
-    );
+    // 🔥 IMPORTANT → only use setWatchlist
+    await setWatchlist(list);
 
-    setWatchlist(list);
     dropdown.innerHTML = "";
     search.value = "";
+
     render();
   }
 
-  /* ---------- RENDER ---------- */
+  /* ================= RENDER ================= */
+
   async function render() {
 
     const rawList = getWatchlist();
 
+    // 🔥 Build enriched stock map
     const stockMap = Object.fromEntries(
       window.allStocks.map(s => [
         s.symbol.trim().toUpperCase(),
@@ -76,6 +73,8 @@ export function setupWatchlist({
       return stockMap[key] || s;
     });
 
+    /* ===== Industry / Category Filters ===== */
+
     const industry = document.getElementById("industryFilter")?.value;
     const category = document.getElementById("categoryFilter")?.value;
 
@@ -84,6 +83,36 @@ export function setupWatchlist({
         (!industry || s.industry === industry) &&
         (!category || s.category === category)
       );
+    }
+
+    if (!list.length) {
+      tableBody.innerHTML = `
+        <tr>
+          <td colspan="9" style="opacity:.5">
+            No stocks match selected filters
+          </td>
+        </tr>`;
+      return;
+    }
+
+    /* ===== Fetch Prices ===== */
+
+    const priceData = await getPrices(list.map(s => s.symbol));
+
+    /* ===== Quick Filter ===== */
+
+    const activeQuickFilter = window.quickFilter || "all";
+
+    if (activeQuickFilter !== "all") {
+      list = list.filter(s => {
+        const d = priceData[s.symbol];
+        if (!d) return false;
+
+        if (activeQuickFilter === "gainers") return d.dayChange > 0;
+        if (activeQuickFilter === "losers") return d.dayChange < 0;
+
+        return true;
+      });
     }
 
     tableBody.innerHTML = "";
@@ -98,36 +127,7 @@ export function setupWatchlist({
       return;
     }
 
-    const priceData = await getPrices(list.map(s => s.symbol));
-
-    const activeQuickFilter = window.quickFilter || "all";
-
-    if (activeQuickFilter !== "all") {
-      list = list.filter(s => {
-        const d = priceData[s.symbol];
-        if (!d) return false;
-
-        if (activeQuickFilter === "gainers") {
-          return d.dayChange > 0;
-        }
-
-        if (activeQuickFilter === "losers") {
-          return d.dayChange < 0;
-        }
-
-        return true;
-      });
-    }
-
-    if (!list.length) {
-      tableBody.innerHTML = `
-        <tr>
-          <td colspan="9" style="opacity:.5">
-            No stocks match selected filters
-          </td>
-        </tr>`;
-      return;
-    }
+    /* ===== Render Rows ===== */
 
     for (const s of list) {
 
@@ -182,7 +182,8 @@ export function setupWatchlist({
 
       tableBody.appendChild(tr);
 
-      // 🔥 Apply flash animation
+      /* ===== Price Flash Animation ===== */
+
       if (oldPrice !== undefined && newPrice !== oldPrice) {
         const priceCell = tr.querySelector(".price-cell");
 
@@ -191,20 +192,23 @@ export function setupWatchlist({
         } else if (newPrice < oldPrice) {
           priceCell.classList.add("flash-down");
         }
+
+        setTimeout(() => {
+          priceCell.classList.remove("flash-up", "flash-down");
+        }, 1000);
       }
 
       previousPrices[s.symbol] = newPrice;
 
+      /* ===== Remove Stock ===== */
+
       tr.querySelector(".remove-btn").onclick = async () => {
-        let updated = getWatchlist().filter(x => x.symbol !== s.symbol);
 
-        await setDoc(
-          doc(db, "users", getUserId()),
-          { watchlist: updated },
-          { merge: true }
-        );
+        let updated = getWatchlist()
+          .filter(x => x.symbol !== s.symbol);
 
-        setWatchlist(updated);
+        await setWatchlist(updated);
+
         render();
       };
     }
