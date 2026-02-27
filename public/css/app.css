@@ -10,7 +10,6 @@ header{
   position: sticky;
   top: 0;
   z-index: 10000;
-
   background:#020617;
   color:#fff;
   padding:18px 32px;
@@ -20,29 +19,10 @@ header{
   border-bottom:1px solid #1f2a44;
 }
 
-header *{
-  pointer-events:auto;
-}
-
 /* ================= APP LAYOUT ================= */
 .app-wrap{
   position: relative;
   z-index: 1;
-}
-
-/* ================= TAB PANELS ================= */
-/* 🔥 ONLY ACTIVE TAB SHOULD RECEIVE CLICKS */
-#watchTab,
-#alertsTab,
-#indicesTab{
-  position: relative;
-  pointer-events: none;
-}
-
-#watchTab[style*="block"],
-#alertsTab[style*="block"],
-#indicesTab[style*="block"]{
-  pointer-events: auto;
 }
 
 /* ================= NAV ================= */
@@ -91,11 +71,32 @@ button{
   color:white;
 }
 
+/* ================= DROPDOWN ================= */
+
+.dropdown {
+  position: absolute;
+  background: #0f172a;
+  border: 1px solid #1f2a44;
+  border-radius: 8px;
+  max-height: 250px;
+  overflow-y: auto;
+  width: 100%;
+  margin-top: 6px;
+  z-index: 9999;
+}
+
+.option {
+  padding: 10px;
+  cursor: pointer;
+}
+
+.option:hover {
+  background: #1e293b;
+}
+
 /* ================= TABLE ================= */
 .table-wrap{
   overflow-x:auto;
-  position: relative;
-  z-index: 0;
 }
 
 .watchlist-table{
@@ -151,6 +152,9 @@ button{
   background:#020617;
   color:white;
 }
+
+/* ================= FILTERS ================= */
+
 .filter-bar {
   display: flex;
   gap: 20px;
@@ -181,6 +185,7 @@ button{
   border-radius: 6px;
   cursor: pointer;
 }
+
 .quick-filters {
   display: flex;
   gap: 8px;
@@ -208,6 +213,7 @@ button{
   color: white;
   border-color: #2563eb;
 }
+
 /* ================= PRICE FLASH ================= */
 
 .flash-up {
