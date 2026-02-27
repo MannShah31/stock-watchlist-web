@@ -333,17 +333,55 @@ async function loadIndices() {
 
     indicesTableBody.innerHTML = "";
 
-    data.nifty50?.forEach(d => {
-      const tr = document.createElement("tr");
-      tr.innerHTML = `
-        <td>${d.symbol.replace(".NS","")}</td>
-        <td>₹${d.price.toFixed(2)}</td>
+    function renderGroup(title, stocks) {
+
+      const headerRow = document.createElement("tr");
+      headerRow.innerHTML = `
+        <td colspan="8" style="font-weight:700;color:#60a5fa;padding-top:20px;">
+          ${title}
+        </td>
       `;
-      indicesTableBody.appendChild(tr);
-    });
+      indicesTableBody.appendChild(headerRow);
+
+      stocks.forEach(d => {
+
+        const tr = document.createElement("tr");
+
+        tr.innerHTML = `
+          <td>${d.symbol.replace(".NS","")}</td>
+
+          <td>₹${d.price?.toFixed(2) ?? "-"}</td>
+
+          <td class="${d.dayChange >= 0 ? "pos" : "neg"}">
+            ₹${d.dayChange?.toFixed(2) ?? "-"}
+          </td>
+
+          <td class="${d.weekChange >= 0 ? "pos" : "neg"}">
+            ${d.weekChange?.toFixed(2) ?? "-"}%
+          </td>
+
+          <td class="${d.monthChange >= 0 ? "pos" : "neg"}">
+            ${d.monthChange?.toFixed(2) ?? "-"}%
+          </td>
+
+          <td class="${d.threeMonthChange >= 0 ? "pos" : "neg"}">
+            ${d.threeMonthChange?.toFixed(2) ?? "-"}%
+          </td>
+
+          <td>${d.high52?.toFixed(2) ?? "-"}</td>
+
+          <td>${d.low52?.toFixed(2) ?? "-"}</td>
+        `;
+
+        indicesTableBody.appendChild(tr);
+      });
+    }
+
+    renderGroup("Nifty 50", data.nifty50 || []);
+    renderGroup("Sensex", data.sensex || []);
 
   } catch (e) {
-    console.error("Indices error", e);
+    console.error("Failed to load indices", e);
   }
 }
 /* ================= TAB SWITCHING ================= */
