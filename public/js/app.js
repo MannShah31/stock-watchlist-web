@@ -346,3 +346,57 @@ async function loadIndices() {
     console.error("Indices error", e);
   }
 }
+/* ================= TAB SWITCHING ================= */
+
+const tabWatch = document.getElementById("tabWatch");
+const tabAlerts = document.getElementById("tabAlerts");
+const tabIndices = document.getElementById("tabIndices");
+
+const watchTab = document.getElementById("watchTab");
+const alertsTab = document.getElementById("alertsTab");
+const indicesTab = document.getElementById("indicesTab");
+
+tabWatch.onclick = () => {
+
+  tabWatch.classList.add("active");
+  tabAlerts.classList.remove("active");
+  tabIndices.classList.remove("active");
+
+  watchTab.style.display = "block";
+  alertsTab.style.display = "none";
+  indicesTab.style.display = "none";
+
+  startWatchlistAutoRefresh();
+  stopIndicesAutoRefresh();
+};
+
+tabAlerts.onclick = () => {
+
+  tabAlerts.classList.add("active");
+  tabWatch.classList.remove("active");
+  tabIndices.classList.remove("active");
+
+  watchTab.style.display = "none";
+  alertsTab.style.display = "block";
+  indicesTab.style.display = "none";
+
+  stopWatchlistAutoRefresh();
+  stopIndicesAutoRefresh();
+
+  alerts?.populateDropdown();
+  alerts?.loadAlerts();
+};
+
+tabIndices.onclick = () => {
+
+  tabIndices.classList.add("active");
+  tabWatch.classList.remove("active");
+  tabAlerts.classList.remove("active");
+
+  watchTab.style.display = "none";
+  alertsTab.style.display = "none";
+  indicesTab.style.display = "block";
+
+  stopWatchlistAutoRefresh();
+  startIndicesAutoRefresh();
+};
