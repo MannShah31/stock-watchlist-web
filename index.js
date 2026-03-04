@@ -122,6 +122,9 @@ async function fetchSingleStock(symbol) {
   high52: Math.max(...closes.slice(-252)),
   low52: Math.min(...closes.slice(-252))
 };
+   marketCap,
+   pe
+};
 
   } catch (e) {
     console.error("fetchSingleStock error:", symbol, e.message);
