@@ -99,29 +99,29 @@ async function fetchSingleStock(symbol) {
     const pe = quote?.trailingPE ?? null;
 
     return {
-      symbol,
-      price: current,
+  symbol,
+  price: current,
 
-      dayChange: prevClose ? current - prevClose : null,
-      changePercent: prevClose
-        ? ((current - prevClose) / prevClose) * 100
-        : null,
+  dayChange: prevClose ? current - prevClose : null,
+  dayChangePercent: prevClose
+    ? ((current - prevClose) / prevClose) * 100
+    : null,
 
-      weekChange: weekAgo
-        ? ((current - weekAgo) / weekAgo) * 100
-        : null,
+  weekChange: weekAgo
+    ? ((current - weekAgo) / weekAgo) * 100
+    : null,
 
-      monthChange: monthAgo
-        ? ((current - monthAgo) / monthAgo) * 100
-        : null,
+  monthChange: monthAgo
+    ? ((current - monthAgo) / monthAgo) * 100
+    : null,
 
-      threeMonthChange: threeMonthAgo
-        ? ((current - threeMonthAgo) / threeMonthAgo) * 100
-        : null,
+  threeMonthChange: threeMonthAgo
+    ? ((current - threeMonthAgo) / threeMonthAgo) * 100
+    : null,
 
-      high52: Math.max(...closes.slice(-252)),
-      low52: Math.min(...closes.slice(-252))
-    };
+  high52: Math.max(...closes.slice(-252)),
+  low52: Math.min(...closes.slice(-252))
+};
 
   } catch (e) {
     console.error("fetchSingleStock error:", symbol, e.message);
