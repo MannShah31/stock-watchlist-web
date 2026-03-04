@@ -167,6 +167,10 @@ export function setupWatchlist({
           ₹${d.dayChange?.toFixed(2) ?? "-"}
         </td>
 
+        <td class="${d.dayChangePercent >= 0 ? "pos" : "neg"}">
+          ${d.dayChangePercent?.toFixed(2) ?? "-"}%
+        </td>
+      
         <td class="${d.weekChange >= 0 ? "pos" : "neg"}">
           ${d.weekChange?.toFixed(2) ?? "-"}%
         </td>
