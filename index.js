@@ -122,8 +122,8 @@ async function fetchSingleStock(symbol) {
   high52: Math.max(...closes.slice(-252)),
   low52: Math.min(...closes.slice(-252))
 };
-   marketCap,
-   pe
+  marketCap,
+  pe
 };
 
   } catch (e) {
