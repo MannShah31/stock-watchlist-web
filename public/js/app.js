@@ -45,8 +45,21 @@ const indicesTableBody = document.getElementById("indicesTableBody");
 
 /* ================== HELPERS ================== */
 
+// ✅ FIX: enrich watchlist items with industry/category from window.allStocks
+function enrichWatchlist(list) {
+  return list.map(item => {
+    const meta = (window.allStocks || []).find(s => s.symbol === item.symbol);
+    return {
+      ...item,
+      industry: item.industry || meta?.industry || "Other",
+      category: item.category || meta?.category || "Unknown"
+    };
+  });
+}
+
 function getCurrentWatchlist() {
-  return watchlists[currentWatchlistName] || [];
+  // ✅ FIX: always enrich before returning
+  return enrichWatchlist(watchlists[currentWatchlistName] || []);
 }
 
 async function saveWatchlists() {
@@ -135,6 +148,7 @@ function populateFiltersFromWatchlist(list) {
     cSelect.appendChild(opt);
   });
 }
+
 function setQuickFilter(type) {
   window.quickFilter = type;
 
@@ -151,6 +165,7 @@ function setQuickFilter(type) {
 
   window.watchlistInstance?.render();
 }
+
 /* ================== AUTH ================== */
 
 setupAuth({
@@ -168,6 +183,7 @@ setupAuth({
     loginScreen.style.display = "none";
     appScreen.style.display = "block";
 
+    // ✅ Load allStocks FIRST so enrichWatchlist() works immediately
     window.allStocks = await getAllStocks();
 
     const userRef = doc(db, "users", userId);
@@ -233,44 +249,44 @@ setupAuth({
     alerts.populateDropdown();
     alerts.loadAlerts();
 
+    // ✅ FIX: pass enriched list to populate filters
     populateFiltersFromWatchlist(getCurrentWatchlist());
+
     /* 🔥 FILTER LISTENERS */
+    document.getElementById("industryFilter")
+      ?.addEventListener("change", () => {
+        window.watchlistInstance?.render();
+      });
 
-document.getElementById("industryFilter")
-  ?.addEventListener("change", () => {
-    window.watchlistInstance?.render();
-  });
+    document.getElementById("categoryFilter")
+      ?.addEventListener("change", () => {
+        window.watchlistInstance?.render();
+      });
 
-document.getElementById("categoryFilter")
-  ?.addEventListener("change", () => {
-    window.watchlistInstance?.render();
-  });
+    document.getElementById("clearFilters")
+      ?.addEventListener("click", () => {
+        document.getElementById("industryFilter").value = "";
+        document.getElementById("categoryFilter").value = "";
+        window.quickFilter = "all";
 
-document.getElementById("clearFilters")
-  ?.addEventListener("click", () => {
-    document.getElementById("industryFilter").value = "";
-    document.getElementById("categoryFilter").value = "";
-    window.quickFilter = "all";
+        document.querySelectorAll(".qf-btn").forEach(btn =>
+          btn.classList.remove("active")
+        );
 
-    document.querySelectorAll(".qf-btn").forEach(btn =>
-      btn.classList.remove("active")
-    );
+        document.getElementById("filterAll")?.classList.add("active");
 
-    document.getElementById("filterAll")?.classList.add("active");
+        window.watchlistInstance?.render();
+      });
 
-    window.watchlistInstance?.render();
-  });
+    /* 🔥 QUICK FILTER BUTTONS */
+    document.getElementById("filterAll")
+      ?.addEventListener("click", () => setQuickFilter("all"));
 
-/* 🔥 QUICK FILTER BUTTONS */
+    document.getElementById("filterGainers")
+      ?.addEventListener("click", () => setQuickFilter("gainers"));
 
-document.getElementById("filterAll")
-  ?.addEventListener("click", () => setQuickFilter("all"));
-
-document.getElementById("filterGainers")
-  ?.addEventListener("click", () => setQuickFilter("gainers"));
-
-document.getElementById("filterLosers")
-  ?.addEventListener("click", () => setQuickFilter("losers"));
+    document.getElementById("filterLosers")
+      ?.addEventListener("click", () => setQuickFilter("losers"));
   },
 
   onLogout: () => {
@@ -293,6 +309,7 @@ document.getElementById("filterLosers")
 watchlistSelector?.addEventListener("change", () => {
   currentWatchlistName = watchlistSelector.value;
   window.watchlistInstance?.render();
+  // ✅ FIX: pass enriched list
   populateFiltersFromWatchlist(getCurrentWatchlist());
 });
 
@@ -384,6 +401,7 @@ async function loadIndices() {
     console.error("Failed to load indices", e);
   }
 }
+
 /* ================= TAB SWITCHING ================= */
 
 const tabWatch = document.getElementById("tabWatch");
