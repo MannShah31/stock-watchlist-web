@@ -340,12 +340,9 @@ app.get("/api/stocks", (_, res) => {
 
     const enriched = stocks.map(s => {
 
-      const cleanSymbol = s.symbol
-        .replace(".NS", "")
-        .replace(".BO", "")
-        .toUpperCase();
+      const cleanSymbol = s.symbol.toUpperCase();
 
-      const metaData = meta[cleanSymbol] || {};
+const metaData = meta[cleanSymbol] || {};
 
       return {
         ...s,
