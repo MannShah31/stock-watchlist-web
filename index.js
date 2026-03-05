@@ -294,19 +294,15 @@ app.get("/api/stocks", (_, res) => {
         fs.readFileSync(path.join(__dirname, "stockMeta.json"), "utf8")
       );
 
-      // 🔥 Normalize meta keys (remove .NS/.BO if present)
+      // normalize meta keys
       Object.keys(rawMeta).forEach(k => {
-        const clean = k.replace(".NS", "").replace(".BO", "").toUpperCase();
+        const clean = k.replace(".NS","").replace(".BO","").toUpperCase();
         meta[clean] = rawMeta[k];
       });
 
     } catch {
       console.log("⚠️ stockMeta.json not found");
     }
-
-    /* =====================
-       INDUSTRY FALLBACK
-    ===================== */
 
     function getIndustry(symbol) {
 
@@ -318,7 +314,7 @@ app.get("/api/stocks", (_, res) => {
       if (symbol.includes("INFY") || symbol.includes("TCS") || symbol.includes("WIPRO") || symbol.includes("TECH"))
         return "IT";
 
-      if (symbol.includes("PHARMA") || symbol.includes("PHARMACEUTICAL") || symbol.includes("LAB"))
+      if (symbol.includes("PHARMA") || symbol.includes("LAB"))
         return "Pharma";
 
       if (symbol.includes("AUTO") || symbol.includes("MOTOR"))
@@ -330,7 +326,7 @@ app.get("/api/stocks", (_, res) => {
       if (symbol.includes("STEEL") || symbol.includes("METAL"))
         return "Metals";
 
-      if (symbol.includes("POWER") || symbol.includes("GRID") || symbol.includes("ENERGY"))
+      if (symbol.includes("POWER") || symbol.includes("GRID"))
         return "Energy";
 
       if (symbol.includes("OIL") || symbol.includes("GAS"))
@@ -342,6 +338,32 @@ app.get("/api/stocks", (_, res) => {
       return "Other";
     }
 
+    const enriched = stocks.map(s => {
+
+      const cleanSymbol = s.symbol
+        .replace(".NS","")
+        .replace(".BO","")
+        .toUpperCase();
+
+      const metaData = meta[cleanSymbol] || {};
+
+      return {
+        ...s,
+        industry: metaData.industry || getIndustry(cleanSymbol),
+        category: metaData.category || "Unknown"
+      };
+
+    });
+
+    res.json(enriched);
+
+  } catch (e) {
+
+    console.error("Failed to read stocks.json", e);
+    res.status(500).json([]);
+
+  }
+});
     /* =====================
        ENRICH STOCK DATA
     ===================== */
