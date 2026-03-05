@@ -242,7 +242,7 @@ async function checkAllAlerts() {
 }
 
 /* =====================
-   🔔 CRON ENDPOINT (IMPORTANT)
+   🔔 CRON ENDPOINT
 ===================== */
 app.get("/run-alerts", async (req, res) => {
   try {
@@ -296,8 +296,11 @@ app.get("/api/stocks", (_, res) => {
         meta[clean] = rawMeta[k];
       });
 
+      // 🔍 DEBUG: confirm meta loaded correctly
+      console.log("✅ META LOADED. Sample keys:", Object.keys(meta).slice(0, 5));
+
     } catch (err) {
-      console.log("⚠️ stockMeta.json not found");
+      console.log("⚠️ stockMeta.json not found or failed to parse:", err.message);
     }
 
     function getIndustry(symbol) {
@@ -336,21 +339,32 @@ app.get("/api/stocks", (_, res) => {
 
     const enriched = stocks.map(s => {
 
-  const cleanSymbol = s.symbol.toUpperCase();
-  const metaKey = cleanSymbol.replace(".NS", "").replace(".BO", "");
-  const metaData = meta[metaKey] || {};
+      const cleanSymbol = s.symbol.toUpperCase();
 
-  // 🔍 DEBUG LOGS — remove after fixing
-  console.log("META KEYS:", Object.keys(meta).slice(0, 3));
-  console.log("STOCK SYMBOL:", cleanSymbol, "→ metaKey:", metaKey);
-  console.log("MATCHED META:", metaData);
+      // ✅ FIX: strip .NS / .BO before meta lookup
+      const metaKey = cleanSymbol.replace(".NS", "").replace(".BO", "");
+      const metaData = meta[metaKey] || {};
 
-  return {
-    ...s,
-    industry: metaData.industry || getIndustry(cleanSymbol),
-    category: metaData.category || "Unknown"
-  };
+      // 🔍 DEBUG: log first 3 stocks only to avoid log spam
+      const idx = stocks.indexOf(s);
+      if (idx < 3) {
+        console.log(`🔍 [${idx}] cleanSymbol=${cleanSymbol} | metaKey=${metaKey} | metaData=`, metaData);
+      }
 
+      return {
+        ...s,
+        industry: metaData.industry || getIndustry(cleanSymbol),
+        category: metaData.category || "Unknown"
+      };
+
+    });
+
+    res.json(enriched);
+
+  } catch (e) {
+    console.error("Failed to read stocks.json", e);
+    res.status(500).json([]);
+  }
 });
 
 /* =====================
@@ -383,7 +397,7 @@ const SENSEX = [
 ];
 
 /* =====================
-   📊 INDICES API (STOCK LEVEL)
+   📊 INDICES API
 ===================== */
 
 app.get("/api/indices", async (_, res) => {
