@@ -282,75 +282,102 @@ app.get("/api/prices", async (req, res) => {
 ===================== */
 app.get("/api/stocks", (_, res) => {
   try {
+
     const stocks = JSON.parse(
       fs.readFileSync(path.join(__dirname, "stocks.json"), "utf8")
     );
 
     let meta = {};
+
     try {
-      meta = JSON.parse(
+      const rawMeta = JSON.parse(
         fs.readFileSync(path.join(__dirname, "stockMeta.json"), "utf8")
       );
+
+      // 🔥 Normalize meta keys (remove .NS/.BO if present)
+      Object.keys(rawMeta).forEach(k => {
+        const clean = k.replace(".NS", "").replace(".BO", "").toUpperCase();
+        meta[clean] = rawMeta[k];
+      });
+
     } catch {
       console.log("⚠️ stockMeta.json not found");
     }
 
-    // 🔥 AUTO INDUSTRY DETECTION (fallback)
+    /* =====================
+       INDUSTRY FALLBACK
+    ===================== */
+
     function getIndustry(symbol) {
+
       symbol = symbol.toUpperCase();
 
       if (symbol.includes("BANK")) return "Banking";
-      if (symbol.includes("PHARMACEUTICAL")) return "Pharma";
-      if (symbol.includes("INFY") || symbol.includes("TCS") || symbol.includes("WIPRO")) return "IT";
-      if (symbol.includes("AUTO") || symbol.includes("MOTORS")) return "Auto";
-      if (symbol.includes("CEMENT")) return "Cement";
-      if (symbol.includes("STEEL") || symbol.includes("METAL")) return "Metals";
-      if (symbol.includes("POWER") || symbol.includes("GRID")) return "Energy";
-      if (symbol.includes("OIL") || symbol.includes("GAS")) return "Energy";
-      if (symbol.includes("EXPORT")) return "Exports";
+      if (symbol.includes("FINANCE") || symbol.includes("CAPITAL")) return "Financials";
+
+      if (symbol.includes("INFY") || symbol.includes("TCS") || symbol.includes("WIPRO") || symbol.includes("TECH"))
+        return "IT";
+
+      if (symbol.includes("PHARMA") || symbol.includes("PHARMACEUTICAL") || symbol.includes("LAB"))
+        return "Pharma";
+
+      if (symbol.includes("AUTO") || symbol.includes("MOTOR"))
+        return "Auto";
+
+      if (symbol.includes("CEMENT"))
+        return "Cement";
+
+      if (symbol.includes("STEEL") || symbol.includes("METAL"))
+        return "Metals";
+
+      if (symbol.includes("POWER") || symbol.includes("GRID") || symbol.includes("ENERGY"))
+        return "Energy";
+
+      if (symbol.includes("OIL") || symbol.includes("GAS"))
+        return "Energy";
+
+      if (symbol.includes("EXPORT"))
+        return "Exports";
+
       return "Other";
     }
 
+    /* =====================
+       ENRICH STOCK DATA
+    ===================== */
+
     const enriched = stocks.map(s => {
 
-  const clean = s.symbol
-    .replace(".NS", "")
-    .replace(".BO", "");
+      const cleanSymbol = s.symbol
+        .replace(".NS", "")
+        .replace(".BO", "")
+        .toUpperCase();
 
-  return {
-    ...s,
+      const metaData = meta[cleanSymbol] || {};
 
-    industry:
-      meta[clean]?.industry ||
-      getIndustry(clean),
+      return {
+        ...s,
 
-    category:
-      meta[clean]?.category ||
-      "Unknown"
-  };
+        industry:
+          metaData.industry ||
+          getIndustry(cleanSymbol),
 
-});
+        category:
+          metaData.category ||
+          "Unknown"
+      };
+
+    });
 
     res.json(enriched);
 
   } catch (e) {
+
     console.error("Failed to read stocks.json", e);
     res.status(500).json([]);
+
   }
 });
-function getIndustry(symbol) {
-  symbol = symbol.toUpperCase();
-
-  if (symbol.includes("BANK")) return "Banking";
-  if (symbol.includes("PHARMACEUTICAL")) return "Pharma";
-  if (symbol.includes("INFY") || symbol.includes("TCS") || symbol.includes("WIPRO")) return "IT";
-  if (symbol.includes("AUTO") || symbol.includes("MOTORS")) return "Auto";
-  if (symbol.includes("CEMENT")) return "Cement";
-  if (symbol.includes("POWER")) return "Power";
-  if (symbol.includes("EXPORTS")) return "Exports";
-
-  return "Other";
-}
 /* =====================
    📊 INDICES API
 ===================== */
