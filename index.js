@@ -340,7 +340,7 @@ app.get("/api/stocks", (_, res) => {
 
       // ✅ FIX: strip .NS / .BO before meta lookup (meta keys have no suffix)
       const metaKey = cleanSymbol.replace(".NS", "").replace(".BO", "");
-      const metaData = meta[metaKey] || {};
+      const metaData = meta[metaKey] || {};       // ✅ fixed — looks up "RELIANCE"
 
       return {
         ...s,
