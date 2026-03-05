@@ -336,26 +336,21 @@ app.get("/api/stocks", (_, res) => {
 
     const enriched = stocks.map(s => {
 
-      const cleanSymbol = s.symbol.toUpperCase();
+  const cleanSymbol = s.symbol.toUpperCase();
+  const metaKey = cleanSymbol.replace(".NS", "").replace(".BO", "");
+  const metaData = meta[metaKey] || {};
 
-      // ✅ FIX: strip .NS / .BO before meta lookup (meta keys have no suffix)
-      const metaKey = cleanSymbol.replace(".NS", "").replace(".BO", "");
-      const metaData = meta[metaKey] || {};       // ✅ fixed — looks up "RELIANCE"
+  // 🔍 DEBUG LOGS — remove after fixing
+  console.log("META KEYS:", Object.keys(meta).slice(0, 3));
+  console.log("STOCK SYMBOL:", cleanSymbol, "→ metaKey:", metaKey);
+  console.log("MATCHED META:", metaData);
 
-      return {
-        ...s,
-        industry: metaData.industry || getIndustry(cleanSymbol),
-        category: metaData.category || "Unknown"
-      };
+  return {
+    ...s,
+    industry: metaData.industry || getIndustry(cleanSymbol),
+    category: metaData.category || "Unknown"
+  };
 
-    });
-
-    res.json(enriched);
-
-  } catch (e) {
-    console.error("Failed to read stocks.json", e);
-    res.status(500).json([]);
-  }
 });
 
 /* =====================
