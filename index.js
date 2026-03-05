@@ -311,16 +311,25 @@ app.get("/api/stocks", (_, res) => {
       return "Other";
     }
 
-    const enriched = stocks.map(s => ({
-      ...s,
-      industry:
-        meta[s.symbol]?.industry ||
-        getIndustry(s.symbol),
+    const enriched = stocks.map(s => {
 
-      category:
-        meta[s.symbol]?.category ||
-        "Unknown"
-    }));
+  const clean = s.symbol
+    .replace(".NS", "")
+    .replace(".BO", "");
+
+  return {
+    ...s,
+
+    industry:
+      meta[clean]?.industry ||
+      getIndustry(clean),
+
+    category:
+      meta[clean]?.category ||
+      "Unknown"
+  };
+
+});
 
     res.json(enriched);
 
