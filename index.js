@@ -99,32 +99,32 @@ async function fetchSingleStock(symbol) {
     const pe = quote?.trailingPE ?? null;
 
     return {
-  symbol,
-  price: current,
+      symbol,
+      price: current,
 
-  dayChange: prevClose ? current - prevClose : null,
-  dayChangePercent: prevClose
-    ? ((current - prevClose) / prevClose) * 100
-    : null,
+      dayChange: prevClose ? current - prevClose : null,
+      dayChangePercent: prevClose
+        ? ((current - prevClose) / prevClose) * 100
+        : null,
 
-  weekChange: weekAgo
-    ? ((current - weekAgo) / weekAgo) * 100
-    : null,
+      weekChange: weekAgo
+        ? ((current - weekAgo) / weekAgo) * 100
+        : null,
 
-  monthChange: monthAgo
-    ? ((current - monthAgo) / monthAgo) * 100
-    : null,
+      monthChange: monthAgo
+        ? ((current - monthAgo) / monthAgo) * 100
+        : null,
 
-  threeMonthChange: threeMonthAgo
-    ? ((current - threeMonthAgo) / threeMonthAgo) * 100
-    : null,
+      threeMonthChange: threeMonthAgo
+        ? ((current - threeMonthAgo) / threeMonthAgo) * 100
+        : null,
 
-  high52: Math.max(...closes.slice(-252)),
-  low52: Math.min(...closes.slice(-252)),
+      high52: Math.max(...closes.slice(-252)),
+      low52: Math.min(...closes.slice(-252)),
 
-  marketCap,
-  pe
-};
+      marketCap,
+      pe
+    };
 
   } catch (e) {
     console.error("fetchSingleStock error:", symbol, e.message);
@@ -132,9 +132,6 @@ async function fetchSingleStock(symbol) {
   }
 }
 
-/* =====================
-   ALERT ENGINE
-===================== */
 /* =====================
    ALERT ENGINE
 ===================== */
@@ -257,12 +254,11 @@ app.get("/run-alerts", async (req, res) => {
   }
 });
 
-/* RUN EVERY 1 MIN (backup) */
-setInterval(checkAllAlerts, 60 * 1000);
 /* RUN EVERY 1 MIN */
 setInterval(checkAllAlerts, 60 * 1000);
+
 /* =====================
-   API: PRICES  ✅ RESTORED
+   API: PRICES
 ===================== */
 app.get("/api/prices", async (req, res) => {
   const symbols = req.query.symbols?.split(",").map(s => s.trim());
@@ -342,7 +338,9 @@ app.get("/api/stocks", (_, res) => {
 
       const cleanSymbol = s.symbol.toUpperCase();
 
-const metaData = meta[cleanSymbol] || {};
+      // ✅ FIX: strip .NS / .BO before meta lookup (meta keys have no suffix)
+      const metaKey = cleanSymbol.replace(".NS", "").replace(".BO", "");
+      const metaData = meta[metaKey] || {};
 
       return {
         ...s,
@@ -359,9 +357,6 @@ const metaData = meta[cleanSymbol] || {};
     res.status(500).json([]);
   }
 });
-/* =====================
-   📊 INDICES API
-===================== */
 
 /* =====================
    📊 INDICES STOCK LIST
@@ -447,8 +442,6 @@ async function fetchIndexHistory(symbol) {
     yoy: ((current - oneYearAgo) / oneYearAgo) * 100
   };
 }
-
-
 
 /* =====================
    START SERVER
