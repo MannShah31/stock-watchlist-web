@@ -294,8 +294,9 @@ app.get("/api/stocks", (_, res) => {
         fs.readFileSync(path.join(__dirname, "stockMeta.json"), "utf8")
       );
 
+      // normalize meta keys (remove .NS / .BO)
       Object.keys(rawMeta).forEach(k => {
-        const clean = k.replace(".NS","").replace(".BO","").toUpperCase();
+        const clean = k.replace(".NS", "").replace(".BO", "").toUpperCase();
         meta[clean] = rawMeta[k];
       });
 
@@ -340,8 +341,8 @@ app.get("/api/stocks", (_, res) => {
     const enriched = stocks.map(s => {
 
       const cleanSymbol = s.symbol
-        .replace(".NS","")
-        .replace(".BO","")
+        .replace(".NS", "")
+        .replace(".BO", "")
         .toUpperCase();
 
       const metaData = meta[cleanSymbol] || {};
@@ -357,46 +358,8 @@ app.get("/api/stocks", (_, res) => {
     res.json(enriched);
 
   } catch (e) {
-
     console.error("Failed to read stocks.json", e);
     res.status(500).json([]);
-
-  }
-});
-    /* =====================
-       ENRICH STOCK DATA
-    ===================== */
-
-    const enriched = stocks.map(s => {
-
-      const cleanSymbol = s.symbol
-        .replace(".NS", "")
-        .replace(".BO", "")
-        .toUpperCase();
-
-      const metaData = meta[cleanSymbol] || {};
-
-      return {
-        ...s,
-
-        industry:
-          metaData.industry ||
-          getIndustry(cleanSymbol),
-
-        category:
-          metaData.category ||
-          "Unknown"
-      };
-
-    });
-
-    res.json(enriched);
-
-  } catch (e) {
-
-    console.error("Failed to read stocks.json", e);
-    res.status(500).json([]);
-
   }
 });
 /* =====================
