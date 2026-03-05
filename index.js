@@ -294,13 +294,12 @@ app.get("/api/stocks", (_, res) => {
         fs.readFileSync(path.join(__dirname, "stockMeta.json"), "utf8")
       );
 
-      // normalize meta keys
       Object.keys(rawMeta).forEach(k => {
         const clean = k.replace(".NS","").replace(".BO","").toUpperCase();
         meta[clean] = rawMeta[k];
       });
 
-    } catch {
+    } catch (err) {
       console.log("⚠️ stockMeta.json not found");
     }
 
